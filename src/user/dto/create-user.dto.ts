@@ -4,4 +4,6 @@ export class CreateUserDto {
     email !: string;
     password !: string;
     university !: string;
+    registrationNumber?: string; // Optional, but required if role is Student
+    role !: string; // Should be 'Admin' or 'Student'
 }

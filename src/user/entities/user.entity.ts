@@ -24,7 +24,11 @@ export class User {
     @Column()
     university !: string;
 
-    @Column({ type: 'enum',enum:Role,default: Role.User })
+    // Correct
+@Column({ 
+    type: 'enum', 
+    enum: Role, 
+    default: Role.User 
+})
     role !: Role;
-
 }
