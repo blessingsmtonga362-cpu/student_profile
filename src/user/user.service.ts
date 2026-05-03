@@ -39,4 +39,10 @@ export class UserService implements OnModuleInit {
   findOne(email: string):Promise<User | null> {
     return this.userRepository.findOneBy({ email });
   }
+  // In user.service.ts
+async findByRegistrationNumber(registrationNumber: string) {
+  return await this.userRepository.findOne({ 
+    where: { registrationNumber: registrationNumber }
+  });
+}
 }
