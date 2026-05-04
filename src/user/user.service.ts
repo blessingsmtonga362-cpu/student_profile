@@ -69,6 +69,12 @@ export class UserService implements OnModuleInit {
     return this.userRepository.findOneBy({ email });
   }
 
+async findByRegistrationNumber(registrationNumber: string) {
+  return await this.userRepository.findOne({ 
+    where: { registrationNumber: registrationNumber }
+  });
+}
+
   async profileDetails(userId: number): Promise<Omit<User, 'password'>> {
     const user = await this.userRepository.findOneBy({ id: userId });
 
@@ -78,5 +84,5 @@ export class UserService implements OnModuleInit {
 
     const { password, ...profileDetails } = user;
     return profileDetails;
-  }
-}
+  }}
+

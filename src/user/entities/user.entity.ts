@@ -8,7 +8,10 @@ export class User {
 
     @Column()
     firstName !: string;
+    @Column({ unique: true })  // Database level: allows NULL
+    registrationNumber !: string;
 
+    //i added this field to the user entity to be able to search for users by their registration number instead of email, which is more convenient for our use case. 
     @Column()
     lastName !: string;
 
@@ -21,7 +24,11 @@ export class User {
     @Column()
     university !: string;
 
-    @Column({ type: 'enum',enum:Role,default: Role.User })
+    // Correct
+@Column({ 
+    type: 'enum', 
+    enum: Role, 
+    default: Role.User 
+})
     role !: Role;
-
 }

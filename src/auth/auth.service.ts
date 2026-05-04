@@ -1,7 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UserService } from '../user/user.service';
+import { UserService } from 'src/user/user.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt'; 
+
+const UNIMA_EMAIL_DOMAIN = '@unima.ac.mw';
 
 @Injectable()
 export class AuthService {
@@ -11,7 +13,11 @@ export class AuthService {
 
    ){}
 async validateUser(email: string, pass: string): Promise<{access_token: string}> {
-    const user = await this.userService.findOne(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail.endsWith(UNIMA_EMAIL_DOMAIN)) {
+        throw new UnauthorizedException('Only University of Malawi email addresses are allowed');
+    }
+    const user = await this.userService.findOne(normalizedEmail);
     if (!user ) {
         throw new UnauthorizedException();
     }
