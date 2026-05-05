@@ -68,24 +68,10 @@ export class UserService implements OnModuleInit {
   findOne(email: string):Promise<User | null> {
     return this.userRepository.findOneBy({ email });
   }
-<<<<<<< HEAD
   // In user.service.ts
 async findByRegistrationNumber(registrationNumber: string) {
   return await this.userRepository.findOne({ 
     where: { registrationNumber: registrationNumber }
   });
 }
-=======
-
-  async profileDetails(userId: number): Promise<Omit<User, 'password'>> {
-    const user = await this.userRepository.findOneBy({ id: userId });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const { password, ...profileDetails } = user;
-    return profileDetails;
-  }
->>>>>>> 1183dac4a6d13c9d822320ac53227cca0eae1c52
 }
