@@ -2,27 +2,27 @@ import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn, CreateDat
 import { User } from '../../user/entities/user.entity';
 
 export enum MaritalStatus {
-  SINGLE = 'single',
-  MARRIED = 'married',
-  DIVORCED = 'divorced',
-  WIDOWED = 'widowed',
-  SEPARATED = 'separated'
+  SINGLE = 'Single',
+  MARRIED = 'Married',
+  DIVORCED = 'Divorced',
+  WIDOWED = 'Widowed',
+  SEPARATED = 'Separated'
 }
 
 export enum Gender {
-  MALE = 'male',
-  FEMALE = 'female',
-  OTHER = 'other'
+  MALE = 'Male',
+  FEMALE = 'Female',
+  OTHER = 'Other'
 }
 
 export enum Disability {
-  NONE = 'none',
-  PHYSICAL = 'physical',
-  VISUAL = 'visual',
-  HEARING = 'hearing',
-  SPEECH = 'speech',
-  INTELLECTUAL = 'intellectual',
-  OTHER = 'other'
+  NONE = 'None',
+  PHYSICAL = 'Physical',
+  VISUAL = 'Visual',
+  HEARING = 'Hearing',
+  SPEECH = 'Speech',
+  INTELLECTUAL = 'Intellectual',
+  OTHER = 'Other'
 }
 
 @Entity('personal_details')

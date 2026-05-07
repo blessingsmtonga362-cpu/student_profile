@@ -1,21 +1,28 @@
+// backend/src/main.ts
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   const configService = app.get(ConfigService);
   
-  // Enable CORS for Next.js frontend
+  // Enable CORS for Next.js frontend - MORE PERMISSIVE FOR TESTING
   app.enableCors({
-    origin: ['http://localhost:3001'], // Frontend URLs
+    origin: true, // Allow all origins temporarily for testing
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    exposedHeaders: ['Authorization'],
   });
-  
-  // Optional: Add global prefix if your routes have /api prefix
-  // app.setGlobalPrefix('api');
   
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);

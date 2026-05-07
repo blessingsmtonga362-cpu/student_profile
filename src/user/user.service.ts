@@ -1,8 +1,8 @@
+// src/user/user.service.ts
 import {
   ConflictException,
   Injectable,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -13,22 +13,14 @@ import * as bcrypt from 'bcrypt';
 import { Role } from '../auth/role.enum';
 
 @Injectable()
-export class UserService implements OnModuleInit {
- constructor(
-  @InjectRepository(User)
-  private userRepository: Repository<User>,
-  private readonly configService: ConfigService,
-  ){}
+export class UserService {
+  constructor(
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private readonly configService: ConfigService,
+  ) {}
 
- async onModuleInit() {
-    const adminExists = await this.userRepository.findOneBy({ role: Role.Admin });
-    if (!adminExists) {
-      await this.createAdmin();
-      console.log('Admin account created successfully');
-    }
-  }
-
-  async create(createUser: CreateUserDto):Promise<User> {
+  async create(createUser: CreateUserDto): Promise<User> {
     const existingUser = await this.userRepository.findOneBy({
       email: createUser.email,
     });
@@ -38,11 +30,15 @@ export class UserService implements OnModuleInit {
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
-    const user = this.userRepository.create({ ...createUser, password: hashedPassword ,role: Role.User});
+    const user = this.userRepository.create({ 
+      ...createUser, 
+      password: hashedPassword,
+      role: Role.User 
+    });
     return this.userRepository.save(user);
   }
 
-  async createAdmin(){
+  async createAdmin() {
     const hashedPassword = await bcrypt.hash(
       this.configService.get<string>('ADMIN_PASSWORD', 'bimto27'),
       10,
@@ -51,27 +47,40 @@ export class UserService implements OnModuleInit {
       university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
       firstName: this.configService.get<string>('ADMIN_FIRST_NAME', 'blessings'),
       lastName: this.configService.get<string>('ADMIN_LAST_NAME', 'network'),
-      email: this.configService.get<string>(
-        'ADMIN_EMAIL',
-        'blessings@network.com',
-      ),
+      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@network.com'),
       password: hashedPassword,
       role: Role.Admin,
     });
     return this.userRepository.save(user);
   }
 
-  findAll():Promise<User[]> {
+  findAll(): Promise<User[]> {
     return this.userRepository.find();
   }
 
-  findOne(email: string):Promise<User | null> {
+  findOne(email: string): Promise<User | null> {
     return this.userRepository.findOneBy({ email });
   }
-  // In user.service.ts
-async findByRegistrationNumber(registrationNumber: string) {
-  return await this.userRepository.findOne({ 
-    where: { registrationNumber: registrationNumber }
-  });
-}
+
+  async findById(id: string): Promise<User | null> {
+    return this.userRepository.findOneBy({ id });
+  }
+
+  async findByRegistrationNumber(registrationNumber: string) {
+    return await this.userRepository.findOne({
+      where: { registrationNumber: registrationNumber }
+    });
+  }
+
+  // ✅ Fixed: Changed userId parameter from number to string (UUID)
+  async profileDetails(userId: string): Promise<Omit<User, 'password'>> {
+    const user = await this.userRepository.findOneBy({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { password, ...profileDetails } = user;
+    return profileDetails;
+  }
 }

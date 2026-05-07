@@ -29,39 +29,39 @@ export class FamilyService {
     return await this.familyRepository.save(family);
   }
 
-  async findAll(): Promise<Family[]> {
-    return await this.familyRepository.find({
-      relations: ['user'],
-      order: { createdAt: 'DESC' },
-    });
+  // In family.service.ts
+
+async findAll(): Promise<Family[]> {
+  return await this.familyRepository.find({
+    order: { createdAt: 'DESC' },
+  });
+}
+
+async findOne(id: string): Promise<Family> {
+  const family = await this.familyRepository.findOne({
+    where: { id },
+    // Remove: relations: ['user'],
+  });
+
+  if (!family) {
+    throw new NotFoundException(`Family member with ID ${id} not found`);
   }
 
-  async findOne(id: string): Promise<Family> {
-    const family = await this.familyRepository.findOne({
-      where: { id },
-      relations: ['user'],
-    });
+  return family;
+}
 
-    if (!family) {
-      throw new NotFoundException(`Family member with ID ${id} not found`);
-    }
+async findByUserId(userId: string): Promise<Family> {
+  const family = await this.familyRepository.findOne({
+    where: { userId },
+    // Remove: relations: ['user'],
+  });
 
-    return family;
+  if (!family) {
+    throw new NotFoundException(`Family member for user ${userId} not found`);
   }
 
-  async findByUserId(userId: string): Promise<Family> {
-    const family = await this.familyRepository.findOne({
-      where: { userId },
-      relations: ['user'],
-    });
-
-    if (!family) {
-      throw new NotFoundException(`Family member for user ${userId} not found`);
-    }
-
-    return family;
-  }
-
+  return family;
+}
   async update(id: string, updateDto: UpdateFamilyDto): Promise<Family> {
     const family = await this.findOne(id);
     Object.assign(family, updateDto);

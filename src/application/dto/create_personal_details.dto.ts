@@ -64,15 +64,11 @@ export class CreatePersonalDetailDto {
   })
   registrationNumber: string;
 
-  @IsEnum(Disability)
-  @IsNotEmpty()
-  disability: Disability;
-
+  // ✅ FIX: Only ONE disability declaration - make it optional
   @IsOptional()
-  @IsString()
-  disabilityDescription?: string;
+  @IsEnum(Disability)
+  disability?: Disability;
 
-  
   @IsOptional()
   @IsUrl()
   studentIdPdfUrl?: string;
@@ -89,17 +85,14 @@ export class CreatePersonalDetailDto {
   @IsString()
   nationalIdFilename?: string;
 
-  
   @IsEnum(MaritalStatus)
   @IsNotEmpty()
   maritalStatus: MaritalStatus;
 
-  // Gender
   @IsEnum(Gender)
   @IsNotEmpty()
   gender: Gender;
 
-  // Payment Details (Optional)
   @IsOptional()
   @IsString()
   paymentBranch?: string;
@@ -121,10 +114,10 @@ export class UpdatePersonalDetailDto extends PartialType(CreatePersonalDetailDto
 
 export class UploadPersonalDocumentsDto {
   @IsOptional()
-  studentId?: any; // For file upload
+  studentId?: any;
 
   @IsOptional()
-  nationalId?: any; // For file upload
+  nationalId?: any;
 }
 
 export class UpdatePaymentDetailsDto {

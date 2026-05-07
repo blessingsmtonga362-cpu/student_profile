@@ -13,7 +13,6 @@ import { AcademicDetails } from '../entities/academic_details.entity';
 import { Family } from '../entities/family.entity';
 import { Education } from '../entities/education.entity';
 
-
 @Injectable()
 export class ReviewService {
   constructor(
@@ -137,53 +136,34 @@ export class ReviewService {
     };
   }
 
-async submitApplication(registrationNumber: string) {
-  // 1. Get user by registration number first
-  const student = await this.userService.findByRegistrationNumber(registrationNumber);
-  if (!student) {
-    throw new NotFoundException(`Student with registration number ${registrationNumber} not found`);
+  async submitApplication(userId: string) {
+    // Validate completeness using user ID
+    const validation = await this.validateApplicationCompleteness(userId);
+    
+    if (!validation.isComplete) {
+      throw new BadRequestException({
+        message: 'Cannot submit application. Please complete all required sections.',
+        missingSections: validation.missingSections,
+        missingFields: validation.missingFields,
+      });
+    }
+
+    // Get all data for final review
+    const applicationData = await this.getCompleteApplication(userId);
+    
+    // Generate application reference number
+    const applicationReference = `APP-${Date.now()}-${userId.slice(0, 8)}`;
+    
+    return {
+      success: true,
+      message: 'Application submitted successfully',
+      applicationReference,
+      submittedAt: new Date(),
+      status: 'pending_review',
+      data: applicationData.data,
+    };
   }
 
-  // 2. Validate completeness using user ID
-  const validation = await this.validateApplicationCompleteness(registrationNumber);
-  
-  if (!validation.isComplete) {
-    throw new BadRequestException({
-      message: 'Cannot submit application. Please complete all required sections.',
-      missingSections: validation.missingSections,
-      missingFields: validation.missingFields,
-    });
-  }
-
-  // 3. Get all data for final review
-  const applicationData = await this.getCompleteApplication(registrationNumber);
-  
-  // 4. Get student name
-  const studentName = `${student.firstName} ${student.lastName}`;
-  
-  // 5. Get program name from academic details
-  const programName = applicationData.data.academicDetails?.programOfStudy || 'Not specified';
-  
-  // 6. Generate application reference number
-  const applicationReference = `APP-${Date.now()}-${registrationNumber.slice(0, 8)}`;
-  
-  // 7. Send NOTIFICATION to STUDENT only (for now)
-  // await this.notificationService.notifyApplicationSent(
-  //   student.id,
-  //   studentName,
-  //   programName,
-  //   applicationReference,
-  // );
-  
-  return {
-    success: true,
-    message: 'Application submitted successfully',
-    applicationReference,
-    submittedAt: new Date(),
-    status: 'pending_review',
-    data: applicationData.data,
-  };
-}
   // ========== CHECK IF APPLICATION IS READY FOR SUBMISSION ==========
   async canSubmitApplication(userId: string): Promise<{
     canSubmit: boolean;

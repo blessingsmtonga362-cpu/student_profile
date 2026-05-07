@@ -17,13 +17,13 @@ export class CreateFamilyDto {
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(100)
-  guardianFirstName: string;
+  guardianFirstName!: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @MaxLength(100)
-  guardianLastName: string;
+  guardianLastName!: string;
 
   @IsString()
   @IsOptional()
@@ -31,7 +31,7 @@ export class CreateFamilyDto {
 
   @IsDateString()
   @IsNotEmpty()
-  dateOfBirth: Date;
+  dateOfBirth!: Date;
 
   @IsEmail()
   @IsOptional()
@@ -39,11 +39,11 @@ export class CreateFamilyDto {
 
   @IsString()
   @IsOptional()
-  traditionalAuthority?: string;
+  traditionalAuthority!: string;
 
   @IsString()
   @IsNotEmpty()
-  residenceAddress: string;
+  residenceAddress!: string;
 
   @IsString()
   @IsOptional()
@@ -51,7 +51,7 @@ export class CreateFamilyDto {
 
   @IsEnum(EducationLevel)
   @IsNotEmpty()
-  levelOfEducation: EducationLevel;
+  levelOfEducation!: EducationLevel;
 
   @IsUrl()
   @IsOptional()

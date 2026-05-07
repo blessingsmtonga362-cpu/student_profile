@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { ApplicationModule } from './application/application.module';
+import { ReviewModule } from './application/modules/review.module';
 
 @Module({
   imports: [
@@ -16,10 +17,14 @@ import { ApplicationModule } from './application/application.module';
       database: 'student-db',
       autoLoadEntities: true,
       synchronize: true,
-}),
+    }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     UserModule,
     AuthModule,
     ApplicationModule,
+    ReviewModule,
   ],
 })
 export class AppModule {}

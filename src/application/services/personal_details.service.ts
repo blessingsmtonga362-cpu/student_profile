@@ -44,17 +44,15 @@ export class PersonalDetailService {
     return await this.personalDetailRepository.save(personalDetail);
   }
 
-async findAll(): Promise<PersonalDetails[]> {
-  return await this.personalDetailRepository.find({
-    relations: ['user'],
-    order: { createdAt: 'DESC' } as any, // Use entity property name
-  });
-}
+  async findAll(): Promise<PersonalDetails[]> {
+    return await this.personalDetailRepository.find({
+      order: { createdAt: 'DESC' } as any,
+    });
+  }
 
   async findOne(id: string): Promise<PersonalDetails> {
     const personalDetail = await this.personalDetailRepository.findOne({
       where: { id },
-      relations: ['user'],
     });
 
     if (!personalDetail) {
@@ -67,7 +65,6 @@ async findAll(): Promise<PersonalDetails[]> {
   async findByUserId(userId: string): Promise<PersonalDetails> {
     const personalDetail = await this.personalDetailRepository.findOne({
       where: { userId },
-      relations: ['user'],
     });
 
     if (!personalDetail) {
@@ -94,7 +91,7 @@ async findAll(): Promise<PersonalDetails[]> {
         where: { registrationNumber: updateDto.registrationNumber }
       });
       if (existing && existing.id !== id) {
-       throw new ConflictException('Registration number already exists');
+        throw new ConflictException('Registration number already exists');
       }
     }
     
@@ -107,34 +104,31 @@ async findAll(): Promise<PersonalDetails[]> {
     return await this.update(personalDetail.id, updateDto);
   }
 
-  // src/application/services/personal_details.service.ts
-// Fix the updateDocuments method
-
-async updateDocuments(
-  userId: string,
-  studentIdPdfUrl?: string,
-  studentIdFilename?: string,
-  nationalIdPdfUrl?: string,
-  nationalIdFilename?: string
-): Promise<PersonalDetails> {
-  const personalDetail = await this.findByUserId(userId);
-  
-  if (studentIdPdfUrl !== undefined) {
-    personalDetail.studentIdPdfUrl = studentIdPdfUrl;
+  async updateDocuments(
+    userId: string,
+    studentIdPdfUrl?: string,
+    studentIdFilename?: string,
+    nationalIdPdfUrl?: string,
+    nationalIdFilename?: string
+  ): Promise<PersonalDetails> {
+    const personalDetail = await this.findByUserId(userId);
+    
+    if (studentIdPdfUrl !== undefined) {
+      personalDetail.studentIdPdfUrl = studentIdPdfUrl;
+    }
+    if (studentIdFilename !== undefined) {
+      personalDetail.studentIdFilename = studentIdFilename;
+    }
+    
+    if (nationalIdPdfUrl !== undefined) {
+      personalDetail.nationalIdPdfUrl = nationalIdPdfUrl;
+    }
+    if (nationalIdFilename !== undefined) {
+      personalDetail.nationalIdFilename = nationalIdFilename;
+    }
+    
+    return await this.personalDetailRepository.save(personalDetail);
   }
-  if (studentIdFilename !== undefined) {
-    personalDetail.studentIdFilename = studentIdFilename;
-  }
-  
-  if (nationalIdPdfUrl !== undefined) {
-    personalDetail.nationalIdPdfUrl = nationalIdPdfUrl;
-  }
-  if (nationalIdFilename !== undefined) {
-    personalDetail.nationalIdFilename = nationalIdFilename;
-  }
-  
-  return await this.personalDetailRepository.save(personalDetail);
-}
 
   async updatePaymentDetails(userId: string, paymentDto: UpdatePaymentDetailsDto): Promise<PersonalDetails> {
     const personalDetail = await this.findByUserId(userId);

@@ -4,17 +4,17 @@ import { PartialType } from '@nestjs/mapped-types';
 export class CreateAcademicDetailDto {
   @IsString()
   @IsNotEmpty()
-  programOfStudy: string;
+  programOfStudy!: string;
 
   @IsString()
   @IsNotEmpty()
-  department: string;
+  department!: string;
 
   @IsNumber()
   @IsNotEmpty()
   @Min(1)
   @Max(6)
-  yearOfStudy: number;
+  yearOfStudy!: number;
 
   @IsUrl()
   @IsOptional()
@@ -25,5 +25,5 @@ export class UpdateAcademicDetailDto extends PartialType(CreateAcademicDetailDto
 
 export class UploadTranscriptDto {
   @IsUrl()
-  transcriptPdfUrl: string;
+  transcriptPdfUrl!: string;
 }
