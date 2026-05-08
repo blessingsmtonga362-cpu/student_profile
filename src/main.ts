@@ -1,3 +1,4 @@
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,18 @@ async function bootstrap() {
     }),
   );
   const configService = app.get(ConfigService);
-  await app.listen(configService.get<number>('PORT', 3001));
+  
+  // Enable CORS for Next.js frontend - MORE PERMISSIVE FOR TESTING
+  app.enableCors({
+    origin: true, // Allow all origins temporarily for testing
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+    exposedHeaders: ['Authorization'],
+  });
+  
+  const port = configService.get<number>('PORT', 3001);
+  await app.listen(port);
+  console.log(`🚀 NestJS backend running on http://localhost:${port}`);
 }
 bootstrap();

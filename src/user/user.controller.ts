@@ -20,8 +20,8 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @Get('profile_details')
-  profileDetails(@Request() req: { user: { sub: number } }) {
-    return this.userService.profileDetails(req.user.sub);
-  }
+  //@Get('profile_details')
+  //profileDetails(@Request() req: { user: { sub: number } }) {
+    //return this.userService.profileDetails(req.user.sub);
+ // }
 }

@@ -4,9 +4,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { ApplicationModule } from './application/application.module';
+import { ReviewModule } from './application/modules/review.module';
 
 @Module({
   imports: [
+
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -23,10 +25,12 @@ import { ApplicationModule } from './application/application.module';
         autoLoadEntities: true,
         synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
       }),
+ 
     }),
     UserModule,
     AuthModule,
     ApplicationModule,
+    ReviewModule,
   ],
 })
 export class AppModule {}
