@@ -8,18 +8,24 @@ import { ReviewModule } from './application/modules/review.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: '2001',
-      database: 'student-db',
-      autoLoadEntities: true,
-      synchronize: true,
-    }),
+
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: '.env',
+    }),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres' as const,
+        host: configService.get<string>('DB_HOST', 'localhost'),
+        port: Number(configService.get<string>('DB_PORT', '5432')),
+        username: configService.get<string>('DB_USERNAME', 'postgres'),
+        password: configService.get<string>('DB_PASSWORD', ''),
+        database: configService.get<string>('DB_NAME', 'student_profile'),
+        autoLoadEntities: true,
+        synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
+      }),
+ 
     }),
     UserModule,
     AuthModule,
