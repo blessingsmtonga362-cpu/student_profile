@@ -1,4 +1,4 @@
-// src/user/user.service.ts
+
 import {
   ConflictException,
   Injectable,
@@ -62,6 +62,14 @@ export class UserService {
     return this.userRepository.findOneBy({ email });
   }
 
+
+async findByRegistrationNumber(registrationNumber: string) {
+  return await this.userRepository.findOne({ 
+    where: { registrationNumber: registrationNumber }
+  });
+}
+
+
   async findById(id: string): Promise<User | null> {
     return this.userRepository.findOneBy({ id });
   }
@@ -82,5 +90,5 @@ export class UserService {
 
     const { password, ...profileDetails } = user;
     return profileDetails;
-  }
-}
+
+  }}
