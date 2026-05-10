@@ -1,4 +1,3 @@
-// src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -12,10 +11,7 @@ export class AuthService {  // Make sure 'export' is here
     private userService: UserService,
     private jwtService: JwtService,
   ) {}
-
-
-   ){}
-async validateUser(email: string, pass: string): Promise<{access_token: string}> {
+async login(email: string, pass: string): Promise<any> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail.endsWith(UNIMA_EMAIL_DOMAIN)) {
         throw new UnauthorizedException('Only University of Malawi email addresses are allowed');

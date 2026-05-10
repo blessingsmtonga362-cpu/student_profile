@@ -1,20 +1,43 @@
 // src/application/modules/review.module.ts
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReviewController } from '../controllers/review.controller';
-import { PersonalDetailModule } from './personal_details.module';
-import { AcademicDetailModule } from './academic_details.module';
-import { FamilyModule } from './family.module';
-import { EducationModule } from './education.module';
+import { ReviewService } from '../services/reviewService';
+import { PersonalDetailService } from '../services/personal_details.service';
+import { AcademicDetailService } from '../services/academic_details.service';
+import { FamilyService } from '../services/family.service';
+import { EducationService } from '../services/education.service';
+import { ApplicationSubmissionService } from '../services/application_submission.service';
+import { PersonalDetails } from '../entities/personal_details.entity';
+import { AcademicDetails } from '../entities/academic_details.entity';
+import { Family } from '../entities/family.entity';
+import { Education } from '../entities/education.entity';
+import { ApplicationSubmission } from '../entities/application_submission.entity';
 import { UserModule } from '../../user/user.module';
 
 @Module({
   imports: [
-    PersonalDetailModule,
-    AcademicDetailModule,
-    FamilyModule,
-    EducationModule,
-    UserModule,
+    TypeOrmModule.forFeature([
+      PersonalDetails,
+      AcademicDetails,
+      Family,
+      Education,
+      ApplicationSubmission,
+    ]),
+    UserModule, // Provides UserService
   ],
   controllers: [ReviewController],
+  providers: [
+    PersonalDetailService,
+    AcademicDetailService,
+    FamilyService,
+    EducationService,
+    ReviewService,
+    ApplicationSubmissionService, // ✅ Must be here
+  ],
+  exports: [
+    ReviewService,
+    ApplicationSubmissionService,
+  ],
 })
 export class ReviewModule {}

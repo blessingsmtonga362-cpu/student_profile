@@ -1,34 +1,48 @@
+// src/user/entities/user.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { Role } from '../../auth/role.enum';
-import { Column,Entity,PrimaryGeneratedColumn } from "typeorm";
 
-@Entity()
+@Entity('user')
 export class User {
-    @PrimaryGeneratedColumn('uuid') 
-    id:string;
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
 
-    @Column()
-    firstName !: string;
-    @Column({ unique: true })  // Database level: allows NULL
-    registrationNumber !: string;
+  @Column()
+  firstName: string;
 
-    //i added this field to the user entity to be able to search for users by their registration number instead of email, which is more convenient for our use case. 
-    @Column()
-    lastName !: string;
+  @Column({ unique: true, nullable: true })
+  registrationNumber: string;
 
-    @Column({ unique: true })
-    email !: string;
+  @Column()
+  lastName: string;
 
-    @Column()
-    password !: string;
+  @Column({ unique: true })
+  email: string;
 
-    @Column()
-    university !: string;
+  @Column()
+  password: string;
 
-    // Correct
-@Column({ 
+  @Column()
+  university: string;
+
+  @Column({ 
     type: 'enum', 
     enum: Role, 
     default: Role.User 
-})
-    role !: Role;
+  })
+  role: Role;
+@Column({ nullable: true })
+otp: string;
+
+  @Column({ nullable: true, type: 'timestamp' })
+  otpExpiry: Date;
+
+  @Column({ default: false })
+  isEmailVerified: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 }

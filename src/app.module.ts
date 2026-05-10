@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { ApplicationModule } from './application/application.module';
 import { ReviewModule } from './application/modules/review.module';
 import { NotificationModule } from './notification/module/notification.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -21,8 +22,8 @@ import { NotificationModule } from './notification/module/notification.module';
         host: configService.get<string>('DB_HOST', 'localhost'),
         port: Number(configService.get<string>('DB_PORT', '5432')),
         username: configService.get<string>('DB_USERNAME', 'postgres'),
-        password: configService.get<string>('DB_PASSWORD', ''),
-        database: configService.get<string>('DB_NAME', 'student_profile'),
+        password: configService.get<string>('DB_PASSWORD', '2001'),
+        database: configService.get<string>('DB_NAME', 'student-db'),
         autoLoadEntities: true,
         synchronize: configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true',
       }),
@@ -33,6 +34,7 @@ import { NotificationModule } from './notification/module/notification.module';
     ApplicationModule,
     ReviewModule,
     NotificationModule,
+    EmailModule,
   ],
 })
 export class AppModule {}
