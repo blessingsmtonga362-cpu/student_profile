@@ -26,6 +26,6 @@ async function bootstrap() {
   
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);
-  console.log(`🚀 NestJS backend running on http://localhost:${port}`);
+  console.log(`Happy birthday Jose`);
 }
 bootstrap();

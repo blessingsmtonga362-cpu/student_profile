@@ -33,7 +33,7 @@ import { AuthModule } from 'src/auth/auth.module';
     FileModule,
     UserModule,
     AuthModule,
-    ReviewModule,  // ✅ Import ReviewModule
+    ReviewModule,  //  Import ReviewModule
   ],
   controllers: [
     PersonalDetailController, 
