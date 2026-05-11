@@ -22,6 +22,7 @@ import { UpdateAcademicDetailDto } from '../dto/create_academic_details.dto';
 import { UpdateFamilyDto } from '../dto/create_family.dto';
 import { UpdateEducationDto } from '../dto/education/update-education.dto';
 import { UserService } from '../../user/user.service'; 
+import { FeePayer } from '../entities/education.entity';
 
 @Controller('review')
 @UseGuards(AuthGuard)
@@ -215,106 +216,208 @@ export class ReviewController {
   }
 
   // ========== SUBMIT FULL APPLICATION ==========
-  @Post('submit-application')
-  async submitFullApplication(@Req() req, @Body() applicationData: any) {
-    const userId = await this.getUserIdFromRequest(req);
-    
-    console.log('=== SUBMIT APPLICATION ===');
-    console.log('User ID:', userId);
-    
-    try {
-      // Save personal details
-      if (applicationData.personal) {
-        console.log('Saving personal details...');
-        
-        const personalData: any = {
-          firstName: applicationData.personal.firstName,
-          lastName: applicationData.personal.lastName || applicationData.personal.surname,
-          phoneNumber: applicationData.personal.phoneNumber,
-          nationalIdNumber: applicationData.personal.nationalIdNumber || applicationData.personal.nationalId,
-          registrationNumber: applicationData.personal.registrationNumber,
-          dateOfBirth: applicationData.personal.dateOfBirth,
-          gender: applicationData.personal.gender,
-          maritalStatus: applicationData.personal.maritalStatus,
-          homeDistrict: applicationData.personal.homeDistrict,
-          traditionalAuthority: applicationData.personal.traditionalAuthority || applicationData.personal.ta,
-          physicalAddress: applicationData.personal.physicalAddress,
-          userId: userId,
-        };
-        
-        if (applicationData.personal.disability && 
-            applicationData.personal.disability !== "None" && 
-            applicationData.personal.disability !== "") {
-          personalData.disability = applicationData.personal.disability;
-        }
-        
-        try {
-          await this.personalDetailService.create(userId, personalData);
-          console.log('Personal details created successfully');
-        } catch (error: any) {
-          if (error.message.includes('already exist')) {
-            const existing = await this.personalDetailService.findByUserId(userId);
-            await this.personalDetailService.update(existing.id, personalData);
-            console.log('Personal details updated successfully');
-          } else {
-            throw error;
-          }
-        }
-      }
+@Post('submit-application')
+async submitFullApplication(@Req() req, @Body() applicationData: any) {
+  const userId = await this.getUserIdFromRequest(req);
+  
+  console.log('=== SUBMIT APPLICATION ===');
+  console.log('User ID:', userId);
+  
+  try {
+    // 1. Save personal details
+    if (applicationData.personal) {
+      console.log('Saving personal details...');
       
-      // Save family details - Mapped correctly for Family entity
-      if (applicationData.family) {
-        console.log('Saving family details...');
-        console.log('Raw family data:', JSON.stringify(applicationData.family, null, 2));
-        
-        const familyData: any = {
-          guardianFirstName: applicationData.family.fatherFirstName || applicationData.family.motherFirstName || 'Not Provided',
-          guardianLastName: applicationData.family.fatherLastName || applicationData.family.motherLastName || 'Not Provided',
-          profession: applicationData.family.fatherProfession || applicationData.family.motherProfession || 'Not Provided',
-          traditionalAuthority: applicationData.family.fatherTa || applicationData.family.motherTa || 'Not Provided',
-          residenceAddress: applicationData.family.fatherResidentialAddress || applicationData.family.motherResidentialAddress || 'Not Provided',
-          postalAddress: applicationData.family.fatherPostalAddress || applicationData.family.motherPostalAddress || 'Not Provided',
-          dateOfBirth: new Date(),
-          userId: userId,
-        };
-        
-        // Add optional fields if they exist
-        if (applicationData.family.fatherPhone) {
-          familyData.phoneNumber = applicationData.family.fatherPhone;
-        }
-        
-        try {
-          await this.familyService.create(userId, familyData);
-          console.log('Family details created successfully');
-        } catch (error: any) {
-          if (error.message.includes('already exists')) {
-            const existing = await this.familyService.findByUserId(userId);
-            await this.familyService.update(existing.id, familyData);
-            console.log('Family details updated successfully');
-          } else {
-            console.error('Family service error:', error.message);
-            // Continue without family details - they are optional
-            console.log('Continuing without family details...');
-          }
-        }
-      }
-      
-      console.log('=== SUBMIT SUCCESS ===');
-      return {
-        success: true,
-        message: 'Application submitted successfully!',
-        submittedAt: new Date(),
-        applicationStatus: 'pending_review',
+      const personalData: any = {
+        firstName: applicationData.personal.firstName,
+        lastName: applicationData.personal.lastName || applicationData.personal.surname,
+        phoneNumber: applicationData.personal.phoneNumber,
+        nationalIdNumber: applicationData.personal.nationalIdNumber || applicationData.personal.nationalId,
+        registrationNumber: applicationData.personal.registrationNumber,
+        dateOfBirth: applicationData.personal.dateOfBirth,
+        gender: applicationData.personal.gender,
+        maritalStatus: applicationData.personal.maritalStatus,
+        homeDistrict: applicationData.personal.homeDistrict,
+        traditionalAuthority: applicationData.personal.traditionalAuthority || applicationData.personal.ta,
+        physicalAddress: applicationData.personal.physicalAddress,
+        userId: userId,
       };
+      
+      if (applicationData.personal.disability && 
+          applicationData.personal.disability !== "None" && 
+          applicationData.personal.disability !== "") {
+        personalData.disability = applicationData.personal.disability;
+      }
+      
+      try {
+        await this.personalDetailService.create(userId, personalData);
+        console.log('Personal details created successfully');
+      } catch (error: any) {
+        if (error.message.includes('already exist')) {
+          const existing = await this.personalDetailService.findByUserId(userId);
+          await this.personalDetailService.update(existing.id, personalData);
+          console.log('Personal details updated successfully');
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    // 2. Save family details
+    if (applicationData.family) {
+      console.log('Saving family details...');
+      
+      try {
+        await this.familyService.createFromParents(userId, applicationData.family);
+        console.log('Family details created successfully');
+      } catch (error: any) {
+        if (error.message.includes('already exists')) {
+          console.log('Family details already exist, skipping...');
+        } else {
+          console.error('Family service error:', error.message);
+        }
+      }
+    }
+    
+    // 3. Save academic details
+    if (applicationData.academics) {
+      console.log('Saving academic details...');
+      
+      const academicData: any = {
+        programOfStudy: applicationData.academics.programOfStudy || 'Not Provided',
+        department: applicationData.academics.department || 'Not Provided',
+        yearOfStudy: applicationData.academics.yearOfStudy || 1,
+        userId: userId,
+      };
+      
+      try {
+        await this.academicDetailService.create(userId, academicData);
+        console.log('Academic details created successfully');
+      } catch (error: any) {
+        if (error.message.includes('already exist')) {
+          const existing = await this.academicDetailService.findByUserId(userId);
+          await this.academicDetailService.update(existing.id, academicData);
+          console.log('Academic details updated successfully');
+        } else {
+          console.error('Academic service error:', error.message);
+        }
+      }
+    }
+    
+   // 4. Save education details (Primary, Secondary, Tertiary)
+if (applicationData.education) {
+  console.log('Saving education details...');
+  
+  // Import FeePayer at the top of your file
+  // import { FeePayer } from '../entities/education.entity';
+  
+  // Helper function to map fee payer values from frontend to backend enum
+  const mapFeePayer = (feePayer: string): FeePayer => {
+    const map: Record<string, FeePayer> = {
+      'Mother': FeePayer.PARENT,
+      'Father': FeePayer.PARENT,
+      'Parent': FeePayer.PARENT,
+      'Parents': FeePayer.PARENT,
+      'Self': FeePayer.SELF,
+      'self': FeePayer.SELF,
+      'Ngo': FeePayer.SPONSOR,
+      'NGO': FeePayer.SPONSOR,
+      'Sponsor': FeePayer.SPONSOR,
+      'Scholarship': FeePayer.SCHOLARSHIP,
+      'Guardian': FeePayer.GUARDIAN,
+      'guardian': FeePayer.GUARDIAN,
+      'Other': FeePayer.OTHER,
+      'other': FeePayer.OTHER,
+    };
+    return map[feePayer] || FeePayer.OTHER;
+  };
+  
+  // Save Primary Education
+  if (applicationData.education.primary && applicationData.education.primary.schoolName) {
+    try {
+      const existingPrimary = await this.educationService.findByLevel(userId, 'primary' as any);
+      const primaryData = {
+        schoolName: applicationData.education.primary.schoolName,
+        tuitionFees: parseFloat(applicationData.education.primary.tuitionFee) || 0,
+        yearCompleted: parseInt(applicationData.education.primary.yearCompleted) || 0,
+        whoPaidFees: mapFeePayer(applicationData.education.primary.whoPaidFees),
+      };
+      
+      if (existingPrimary && existingPrimary.length > 0) {
+        await this.educationService.update(existingPrimary[0].id, primaryData);
+        console.log('Primary education updated');
+      } else {
+        await this.educationService.createPrimary(userId, primaryData);
+        console.log('Primary education created');
+      }
     } catch (error: any) {
-      console.error('=== SUBMIT ERROR ===');
-      console.error('Error message:', error.message);
-      throw new BadRequestException({
-        message: 'Failed to submit application',
-        error: error.message,
-      });
+      console.error('Primary education error:', error.message);
     }
   }
+  
+  // Save Secondary Education
+  if (applicationData.education.secondary && applicationData.education.secondary.schoolName) {
+    try {
+      const existingSecondary = await this.educationService.findByLevel(userId, 'secondary' as any);
+      const secondaryData = {
+        schoolName: applicationData.education.secondary.schoolName,
+        tuitionFees: parseFloat(applicationData.education.secondary.tuitionFee) || 0,
+        yearCompleted: parseInt(applicationData.education.secondary.yearCompleted) || 0,
+        whoPaidFees: mapFeePayer(applicationData.education.secondary.whoPaidFees),
+      };
+      
+      if (existingSecondary && existingSecondary.length > 0) {
+        await this.educationService.update(existingSecondary[0].id, secondaryData);
+        console.log('Secondary education updated');
+      } else {
+        await this.educationService.createSecondary(userId, secondaryData);
+        console.log('Secondary education created');
+      }
+    } catch (error: any) {
+      console.error('Secondary education error:', error.message);
+    }
+  }
+  
+  // Save Tertiary Education (optional)
+  if (applicationData.education.tertiary && applicationData.education.tertiary.schoolName) {
+    try {
+      const existingTertiary = await this.educationService.findByLevel(userId, 'tertiary' as any);
+      const tertiaryData = {
+        schoolName: applicationData.education.tertiary.schoolName,
+        tuitionFees: parseFloat(applicationData.education.tertiary.tuitionFee) || 0,
+        yearCompleted: parseInt(applicationData.education.tertiary.yearCompleted) || 0,
+        whoPaidFees: mapFeePayer(applicationData.education.tertiary.whoPaidFees),
+      };
+      
+      if (existingTertiary && existingTertiary.length > 0) {
+        await this.educationService.update(existingTertiary[0].id, tertiaryData);
+        console.log('Tertiary education updated');
+      } else {
+        await this.educationService.createTertiary(userId, tertiaryData);
+        console.log('Tertiary education created');
+      }
+    } catch (error: any) {
+      console.error('Tertiary education error:', error.message);
+    }
+  }
+}
+    
+    console.log('=== SUBMIT SUCCESS ===');
+    return {
+      success: true,
+      message: 'Application submitted successfully!',
+      submittedAt: new Date(),
+      applicationStatus: 'pending_review',
+    };
+  } catch (error: any) {
+    console.error('=== SUBMIT ERROR ===');
+    console.error('Error message:', error.message);
+    throw new BadRequestException({
+      message: 'Failed to submit application',
+      error: error.message,
+    });
+  }
+}
 
   // ========== SUBMIT FOR FINAL REVIEW ==========
   @Post('submit')

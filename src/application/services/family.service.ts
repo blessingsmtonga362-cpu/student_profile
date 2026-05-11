@@ -29,39 +29,70 @@ export class FamilyService {
     return await this.familyRepository.save(family);
   }
 
-  // In family.service.ts
+  // New method: Create family from parent data (father/mother)
+  async createFromParents(userId: string, familyData: any): Promise<Family> {
+    // Check if family member already exists for this user
+    const existingFamily = await this.familyRepository.findOne({
+      where: { userId }
+    });
 
-async findAll(): Promise<Family[]> {
-  return await this.familyRepository.find({
-    order: { createdAt: 'DESC' },
-  });
-}
+    if (existingFamily) {
+      throw new BadRequestException('Family member already exists for this user');
+    }
 
-async findOne(id: string): Promise<Family> {
-  const family = await this.familyRepository.findOne({
-    where: { id },
-    // Remove: relations: ['user'],
-  });
+    // Transform frontend parent data to backend guardian data
+    const transformedData = {
+      guardianFirstName: familyData.fatherFirstName || familyData.motherFirstName || 'Not Provided',
+      guardianLastName: familyData.fatherLastName || familyData.motherLastName || 'Not Provided',
+      profession: familyData.fatherProfession || familyData.motherProfession || 'Not Provided',
+      traditionalAuthority: familyData.fatherTa || familyData.motherTa || 'Not Provided',
+      residenceAddress: familyData.fatherResidentialAddress || familyData.motherResidentialAddress || 'Not Provided',
+      postalAddress: familyData.fatherPostalAddress || familyData.motherPostalAddress || 'Not Provided',
+      dateOfBirth: new Date(),
+      userId: userId,
+    };
+    
+    // Add optional fields if they exist
+    if (familyData.fatherPhone) {
+      (transformedData as any).phoneNumber = familyData.fatherPhone;
+    }
+    
+    // ✅ Fixed: Only pass transformedData (it already contains userId)
+    const family = this.familyRepository.create(transformedData);
 
-  if (!family) {
-    throw new NotFoundException(`Family member with ID ${id} not found`);
+    return await this.familyRepository.save(family);
   }
 
-  return family;
-}
-
-async findByUserId(userId: string): Promise<Family> {
-  const family = await this.familyRepository.findOne({
-    where: { userId },
-    // Remove: relations: ['user'],
-  });
-
-  if (!family) {
-    throw new NotFoundException(`Family member for user ${userId} not found`);
+  async findAll(): Promise<Family[]> {
+    return await this.familyRepository.find({
+      order: { createdAt: 'DESC' },
+    });
   }
 
-  return family;
-}
+  async findOne(id: string): Promise<Family> {
+    const family = await this.familyRepository.findOne({
+      where: { id },
+    });
+
+    if (!family) {
+      throw new NotFoundException(`Family member with ID ${id} not found`);
+    }
+
+    return family;
+  }
+
+  async findByUserId(userId: string): Promise<Family> {
+    const family = await this.familyRepository.findOne({
+      where: { userId },
+    });
+
+    if (!family) {
+      throw new NotFoundException(`Family member for user ${userId} not found`);
+    }
+
+    return family;
+  }
+
   async update(id: string, updateDto: UpdateFamilyDto): Promise<Family> {
     const family = await this.findOne(id);
     Object.assign(family, updateDto);
