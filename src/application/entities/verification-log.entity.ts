@@ -3,29 +3,29 @@ import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn } from 'typeor
 @Entity('verification_logs')
 export class VerificationLog {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id !: string;
 
   @Column({ name: 'user_id' })
-  userId: string;
+  userId !: string;
 
   @Column({ name: 'document_type' })
-  documentType: string;
+  documentType !: string;
 
   @Column({ name: 'user_input', type: 'text', nullable: true })
-  userInput: string;
+  userInput !: string;
 
   @Column({ name: 'extracted_data', type: 'text', nullable: true })
-  extractedData: string;
+  extractedData !:  string;
 
   @Column({ name: 'is_verified', default: false })
-  isVerified: boolean;
+  isVerified !: boolean;
 
   @Column({ name: 'mismatches', type: 'text', nullable: true })
-  mismatches: string;
+  mismatches !: string;
 
   @Column({ name: 'warnings', type: 'text', nullable: true })
-  warnings: string;
+  warnings !: string;
 
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt !: Date;
 }

@@ -1,14 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PersonalDetails, MaritalStatus, Gender, Disability } from '../entities/personal_details.entity';
 import { CreatePersonalDetailDto, UpdatePersonalDetailDto, UpdatePaymentDetailsDto } from '../dto/create_personal_details.dto';
-
+import { AdminService } from 'src/admin/admin.service';
 @Injectable()
 export class PersonalDetailService {
   constructor(
     @InjectRepository(PersonalDetails)
     private personalDetailRepository: Repository<PersonalDetails>,
+    @Inject(forwardRef(() => AdminService))
+    private readonly adminService: AdminService
   ) {}
 
   async create(userId: string, createDto: CreatePersonalDetailDto): Promise<PersonalDetails> {
@@ -41,7 +43,9 @@ export class PersonalDetailService {
       ...createDto,
     });
 
-    return await this.personalDetailRepository.save(personalDetail);
+    const saved= await this.personalDetailRepository.save(personalDetail);
+    await this.adminService.syncProfile(saved);
+    return saved;
   }
 
   async findAll(): Promise<PersonalDetails[]> {

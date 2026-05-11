@@ -1,0 +1,76 @@
+# Ultra-Concise Prompt for Codex/ChatGPT
+
+Copy and paste this directly into Codex or ChatGPT to implement StudentProfile architecture:
+
+---
+
+I'm working on a NestJS Student Profile system (PostgreSQL, TypeORM 0.3.28). Current issue: student data is scattered across separate tables (PersonalDetails, Education, Family, AcademicDetails, VerificationLog) with loose userId connections, making it hard for admins to view complete profiles.
+
+**Goal**: Create a StudentProfile entity as a central hub that connects all student data.
+
+**Your tasks**:
+
+1. **Create `src/application/entities/student-profile.entity.ts`**:
+   - id: UUID primary key
+   - user: OneToOne() → User entity
+   - registrationNumber: UNIQUE string (REG-XXXXX format)
+   - enrollmentStatus: enum (enrolled|graduated|suspended|dropped)
+   - enrollmentDate: Date
+   - personalDetails: OneToMany() → PersonalDetails[]
+   - educationHistory: OneToMany() → Education[]
+   - familyMembers: OneToMany() → Family[]
+   - academicDetails: OneToOne() → AcademicDetails
+   - verificationLogs: OneToMany() → VerificationLog[]
+   - createdAt, updatedAt timestamps
+
+2. **Update 5 entities** (change userId → studentId, add relationships):
+   - PersonalDetails: Add @ManyToOne(() => StudentProfile, (sp) => sp.personalDetails) and rename userId to studentId
+   - Education: Same pattern with OneToMany
+   - Family: Same pattern with OneToMany  
+   - AcademicDetails: Use OneToOne relationship
+   - VerificationLog: Use OneToMany relationship
+
+3. **Create `src/application/services/student-profile.service.ts`**:
+   - createStudentProfile(userId, registrationNumber)
+   - getCompleteStudentProfile(registrationNumber) - load all relations
+   - getAllStudents(page, limit)
+   - updateEnrollmentStatus(registrationNumber, status)
+   - deleteStudentProfile(id)
+
+4. **Create `src/application/controllers/student-profile.controller.ts`**:
+   - POST /student-profile/create
+   - GET /student-profile/:registrationNumber - returns complete profile with all nested data
+   - GET /student-profile - paginated list
+   - PATCH /student-profile/:registrationNumber/status
+   - DELETE /student-profile/:id
+   - All with @UseGuards(AuthGuard)
+
+5. **Create `src/application/modules/student-profile.module.ts`**:
+   - Import TypeOrmModule with StudentProfile and all related entities
+   - Import FileModule, UserModule, AuthModule
+   - Provide StudentProfileService and StudentProfileController
+
+6. **Update `src/application/application.module.ts`**:
+   - Import StudentProfileModule
+   - Add StudentProfile to TypeOrmModule.forFeature()
+
+7. **Update existing services** (PersonalDetailService, EducationService, FamilyService, AcademicDetailService, DocumentUploadService, ReviewService):
+   - Replace all userId parameters/columns with studentId
+   - Update repository queries to filter by studentId
+
+8. **Update existing controllers** (PersonalDetailController, EducationController, FamilyController, AcademicDetailController, DocumentUploadController, ReviewController):
+   - Get StudentProfile first from user ID
+   - Pass studentProfile.id to services instead of userId
+
+9. **Create database migration**:
+   - Create student_profile table
+   - Add student_id column to all related tables
+   - Migrate data: copy userId → student_id, create StudentProfile records
+   - Add foreign key constraints
+   - Drop old user_id columns
+
+Result: Admins can query complete student profile → `await studentProfileService.getCompleteStudentProfile('REG-20240001')` and get object with all nested data (personalDetails, education, family, academicDetails, verificationLogs all in one object).
+
+---
+
+Use this prompt as-is. It contains all the context and requirements Codex needs.

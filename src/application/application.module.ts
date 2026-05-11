@@ -22,6 +22,7 @@ import { DocumentUploadService } from './services/document-upload.service';
 //import { NotificationModule } from 'src/notification/module/studentNotification.module';
 import { UserModule } from 'src/user/user.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { AdminModule } from 'src/admin/admin.module';
 
 
 @Module({
@@ -31,6 +32,7 @@ import { AuthModule } from 'src/auth/auth.module';
     //NotificationModule,
     UserModule,
     AuthModule,
+    AdminModule,
   ],
   controllers: [
     PersonalDetailController, 

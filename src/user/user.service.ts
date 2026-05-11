@@ -74,11 +74,6 @@ async findByRegistrationNumber(registrationNumber: string) {
     return this.userRepository.findOneBy({ id });
   }
 
-  async findByRegistrationNumber(registrationNumber: string) {
-    return await this.userRepository.findOne({
-      where: { registrationNumber: registrationNumber }
-    });
-  }
 
   // ✅ Fixed: Changed userId parameter from number to string (UUID)
   async profileDetails(userId: string): Promise<Omit<User, 'password'>> {

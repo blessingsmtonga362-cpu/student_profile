@@ -1,7 +1,5 @@
 // src/application/services/review.service.ts
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PersonalDetailService } from './personal_details.service';
 import { AcademicDetailService } from './academic_details.service';
 import { FamilyService } from './family.service';
@@ -16,6 +14,7 @@ import { Education } from '../entities/education.entity';
 @Injectable()
 export class ReviewService {
   constructor(
+    @Inject(forwardRef(() => PersonalDetailService))
     private readonly personalDetailService: PersonalDetailService,
     private readonly academicDetailService: AcademicDetailService,
     private readonly familyService: FamilyService,
