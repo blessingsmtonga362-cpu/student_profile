@@ -41,7 +41,7 @@ import { AuthModule } from 'src/auth/auth.module';
     FamilyController,
     EducationController,
     DocumentUploadController,
-    // ReviewController is now in ReviewModule
+    
   ],
   providers: [
     PersonalDetailService, 
@@ -49,7 +49,6 @@ import { AuthModule } from 'src/auth/auth.module';
     FamilyService,
     EducationService,
     DocumentUploadService,
-    // ReviewService and ApplicationSubmissionService are now in ReviewModule
   ],
   exports: [
     PersonalDetailService, 

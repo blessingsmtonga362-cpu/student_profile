@@ -15,9 +15,9 @@ async function bootstrap() {
   );
   const configService = app.get(ConfigService);
   
-  // Enable CORS for Next.js frontend - MORE PERMISSIVE FOR TESTING
+  
   app.enableCors({
-    origin: true, // Allow all origins temporarily for testing
+    origin: true, 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],

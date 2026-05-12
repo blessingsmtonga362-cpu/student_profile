@@ -157,7 +157,7 @@ export class UserService {
       university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
       firstName: this.configService.get<string>('ADMIN_FIRST_NAME', 'blessings'),
       lastName: this.configService.get<string>('ADMIN_LAST_NAME', 'network'),
-      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@network.com'),
+      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
       password: hashedPassword,
       role: Role.Admin,
     });
