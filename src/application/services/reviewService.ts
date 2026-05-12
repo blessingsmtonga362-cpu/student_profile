@@ -29,7 +29,7 @@ export class ReviewService {
       this.personalDetailService.findByUserId(userId).catch(() => null),
       this.academicDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
-      this.educationService.findByUserId(userId).catch(() => []),
+      this.educationService.findByUserId(userId).catch((): Education[] => []),
     ]);
 
     const totalSections = 4;

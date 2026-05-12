@@ -3,16 +3,24 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProfileData } from 'src/application/entities/profile_data';
 import { PersonalDetails } from 'src/application/entities/personal_details.entity';
+import { AcademicDetails } from 'src/application/entities/academic_details.entity';
+import { VerificationLog } from 'src/application/entities/verification-log.entity';
 import { ReviewService } from 'src/application/services/reviewService';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { StudentNotificationService } from 'src/notification/service/studentNotification.service';
 
 @Injectable()
 export class AdminService {
 constructor(
   @InjectRepository(ProfileData)
   private readonly profileRepo: Repository<ProfileData>,
+  @InjectRepository(AcademicDetails)
+  private readonly academicRepo: Repository<AcademicDetails>,
+  @InjectRepository(VerificationLog)
+  private readonly verificationLogRepo: Repository<VerificationLog>,
   @Inject(forwardRef(() => ReviewService))
-  private readonly reviewRepo: ReviewService
+  private readonly reviewRepo: ReviewService,
+  private readonly notificationService: StudentNotificationService,
 ){}
 
 async syncProfile(personal: PersonalDetails) {
@@ -42,8 +50,87 @@ async syncProfile(personal: PersonalDetails) {
 async getProfiles(){
   return await this.profileRepo.find()
 }
+
+async getDashboardStats() {
+  const [profiles, approvedSupport, flaggedFiles] = await Promise.all([
+    this.profileRepo.find({
+      order: { status: 'ASC', firstName: 'ASC', lastName: 'ASC' },
+    }),
+    this.profileRepo.count({
+      where: { status: 'Approved' },
+    }),
+    this.verificationLogRepo.count({
+      where: { isVerified: false },
+    }),
+  ]);
+
+  const academicDetails = profiles.length
+    ? await this.academicRepo.find({
+        where: profiles.map((profile) => ({ userId: profile.userId })),
+      })
+    : [];
+
+  const academicsByUserId = new Map(
+    academicDetails.map((record) => [record.userId, record]),
+  );
+
+  const queueProfiles = profiles
+    .filter((profile) => profile.status !== 'Approved')
+    .slice(0, 10);
+
+  const completionByUserId = new Map(
+    await Promise.all(
+      queueProfiles.map(async (profile) => {
+        const submissionReadiness = await this.reviewRepo
+          .canSubmitApplication(profile.userId)
+          .catch(() => ({
+            completionPercentage: 0,
+          }));
+
+        return [profile.userId, Math.round(submissionReadiness.completionPercentage)] as const;
+      }),
+    ),
+  );
+
+  return {
+    totalApplications: profiles.length,
+    approvedSupport,
+    flaggedFiles,
+    priorityQueue: queueProfiles.map((profile) => {
+        const academic = academicsByUserId.get(profile.userId);
+        return {
+          id: profile.userId,
+          name: `${profile.firstName} ${profile.lastName}`.trim(),
+          program: academic?.programOfStudy ?? 'Programme not yet submitted',
+          score: completionByUserId.get(profile.userId) ?? 0,
+        };
+      }),
+  };
+}
+
 viewmore(userId: string){
   return this.reviewRepo.getCompleteApplication(userId);
+}
+
+async getAdminNotifications(adminId: string) {
+  const result = await this.notificationService.getUserNotifications(adminId, {
+    limit: 50,
+    offset: 0,
+  });
+
+  return result.notifications;
+}
+
+async markAdminNotificationRead(notificationId: string, adminId: string) {
+  return this.notificationService.markAsRead(notificationId, adminId);
+}
+
+async markAllAdminNotificationsRead(adminId: string) {
+  return this.notificationService.markAllAsRead(adminId);
+}
+
+async clearAdminNotifications(adminId: string) {
+  return this.notificationService.deleteAllNotifications(adminId);
 }
 
 async reviewApplication(userId: string, createAdminDto: CreateAdminDto) {
@@ -65,7 +152,4 @@ async reviewApplication(userId: string, createAdminDto: CreateAdminDto) {
   return { message: 'Application reviewed successfully' };
 
 }
-
-
-
 }

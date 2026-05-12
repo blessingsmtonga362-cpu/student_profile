@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { existsSync } from 'fs';
@@ -8,6 +8,8 @@ import { AuthModule } from './auth/auth.module';
 import { ApplicationModule } from './application/application.module';
 import { ReviewModule } from './application/modules/review.module';
 import { AdminModule } from './admin/admin.module';
+import { UserService } from './user/user.service';
+import { NotificationModule } from './notification/module/notification.module';
 
 const envFilePath = join(process.cwd(), '.env');
 
@@ -73,6 +75,18 @@ function validateEnv(config: Record<string, string | undefined>) {
     ApplicationModule,
     ReviewModule,
     AdminModule,
+    NotificationModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  constructor(private userService: UserService) {}
+
+  async onModuleInit() {
+    // Auto-seed admin user if it doesn't exist
+    try {
+      await this.userService.createAdmin();
+    } catch (error) {
+      console.error('Failed to seed admin user:', error instanceof Error ? error.message : error);
+    }
+  }
+}

@@ -20,7 +20,7 @@ export class UserService {
     private readonly configService: ConfigService,
   ) {}
 
-  async create(createUser: CreateUserDto): Promise<User> {
+  async create(createUser: CreateUserDto): Promise<Omit<User, 'password'>> {
     const existingUser = await this.userRepository.findOneBy({
       email: createUser.email,
     });
@@ -30,28 +30,43 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
-    const user = this.userRepository.create({ 
-      ...createUser, 
+    const user = this.userRepository.create({
+      ...createUser,
       password: hashedPassword,
-      role: Role.User 
+      role: Role.User,
     });
-    return this.userRepository.save(user);
+
+    const savedUser = await this.userRepository.save(user);
+    const { password, ...result } = savedUser;
+    return result;
   }
 
   async createAdmin() {
+    const existingAdmin = await this.userRepository.findOneBy({
+      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
+    });
+
+    if (existingAdmin) {
+      console.log('Admin user already exists');
+      return existingAdmin;
+    }
+
     const hashedPassword = await bcrypt.hash(
       this.configService.get<string>('ADMIN_PASSWORD', 'bimto27'),
       10,
     );
     const user = this.userRepository.create({
-      university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
       firstName: this.configService.get<string>('ADMIN_FIRST_NAME', 'blessings'),
       lastName: this.configService.get<string>('ADMIN_LAST_NAME', 'network'),
-      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@network.com'),
+      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
       password: hashedPassword,
+      university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
+      registrationNumber: this.configService.get<string>('ADMIN_REGISTRATION_NUMBER'), // Admins do not have registration numbers
       role: Role.Admin,
     });
-    return this.userRepository.save(user);
+    const savedAdmin = await this.userRepository.save(user);
+    console.log('✅ Admin user created successfully');
+    return savedAdmin;
   }
 
   findAll(): Promise<User[]> {
@@ -64,18 +79,16 @@ export class UserService {
 
 
 async findByRegistrationNumber(registrationNumber: string) {
-  return await this.userRepository.findOne({ 
-    where: { registrationNumber: registrationNumber }
-  });
-}
-
+    if (!registrationNumber) return null;
+    return await this.userRepository.findOne({
+      where: { registrationNumber },
+    });
+  }
 
   async findById(id: string): Promise<User | null> {
     return this.userRepository.findOneBy({ id });
   }
 
-
-  // ✅ Fixed: Changed userId parameter from number to string (UUID)
   async profileDetails(userId: string): Promise<Omit<User, 'password'>> {
     const user = await this.userRepository.findOneBy({ id: userId });
 
@@ -85,5 +98,4 @@ async findByRegistrationNumber(registrationNumber: string) {
 
     const { password, ...profileDetails } = user;
     return profileDetails;
-
   }}

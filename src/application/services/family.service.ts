@@ -29,38 +29,27 @@ export class FamilyService {
     return await this.familyRepository.save(family);
   }
 
-  // New method: Create family from parent data (father/mother)
-  async createFromParents(userId: string, familyData: any): Promise<Family> {
-    // Check if family member already exists for this user
+  async upsertByUserId(userId: string, data: CreateFamilyDto): Promise<Family> {
     const existingFamily = await this.familyRepository.findOne({
-      where: { userId }
+      where: { userId },
     });
 
     if (existingFamily) {
-      throw new BadRequestException('Family member already exists for this user');
+      Object.assign(existingFamily, data);
+      return await this.familyRepository.save(existingFamily);
     }
 
-    // Transform frontend parent data to backend guardian data
-    const transformedData = {
-      guardianFirstName: familyData.fatherFirstName || familyData.motherFirstName || 'Not Provided',
-      guardianLastName: familyData.fatherLastName || familyData.motherLastName || 'Not Provided',
-      profession: familyData.fatherProfession || familyData.motherProfession || 'Not Provided',
-      traditionalAuthority: familyData.fatherTa || familyData.motherTa || 'Not Provided',
-      residenceAddress: familyData.fatherResidentialAddress || familyData.motherResidentialAddress || 'Not Provided',
-      postalAddress: familyData.fatherPostalAddress || familyData.motherPostalAddress || 'Not Provided',
-      dateOfBirth: new Date(),
-      userId: userId,
-    };
-    
-    // Add optional fields if they exist
-    if (familyData.fatherPhone) {
-      (transformedData as any).phoneNumber = familyData.fatherPhone;
-    }
-    
-    // ✅ Fixed: Only pass transformedData (it already contains userId)
-    const family = this.familyRepository.create(transformedData);
+    const family = this.familyRepository.create({
+      userId,
+      ...data,
+    });
 
     return await this.familyRepository.save(family);
+  }
+
+  // New method: Create family from parent data (father/mother)
+  async createFromParents(userId: string, familyData: any): Promise<Family> {
+    return this.upsertByUserId(userId, familyData);
   }
 
   async findAll(): Promise<Family[]> {

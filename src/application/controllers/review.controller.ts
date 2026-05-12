@@ -22,7 +22,8 @@ import { UpdateAcademicDetailDto } from '../dto/create_academic_details.dto';
 import { UpdateFamilyDto } from '../dto/create_family.dto';
 import { UpdateEducationDto } from '../dto/education/update-education.dto';
 import { UserService } from '../../user/user.service'; 
-import { FeePayer } from '../entities/education.entity';
+import { Education, EducationLevel, FeePayer } from '../entities/education.entity';
+import { Disability, Gender, MaritalStatus } from '../entities/personal_details.entity';
 
 @Controller('review')
 @UseGuards(AuthGuard)
@@ -43,6 +44,178 @@ export class ReviewController {
     return String(user.id);
   }
 
+  private toOptionalString(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  }
+
+  private toOptionalNumber(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '') return undefined;
+    const parsed = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  private mapDisability(value: unknown): Disability | undefined {
+    const normalized = this.toOptionalString(value);
+    if (!normalized) return Disability.NONE;
+
+    const disabilityMap: Record<string, Disability> = {
+      none: Disability.NONE,
+      physical: Disability.PHYSICAL,
+      visual: Disability.VISUAL,
+      hearing: Disability.HEARING,
+      speech: Disability.SPEECH,
+      intellectual: Disability.INTELLECTUAL,
+      other: Disability.OTHER,
+    };
+
+    return disabilityMap[normalized.toLowerCase()] ?? Disability.OTHER;
+  }
+
+  private mapFeePayer(value: unknown): FeePayer {
+    const normalized = this.toOptionalString(value)?.toLowerCase();
+    if (!normalized) return undefined as unknown as FeePayer;
+
+    const map: Record<string, FeePayer> = {
+      mother: FeePayer.PARENT,
+      father: FeePayer.PARENT,
+      parent: FeePayer.PARENT,
+      parents: FeePayer.PARENT,
+      sponsor: FeePayer.SPONSOR,
+      ngo: FeePayer.SPONSOR,
+      scholarship: FeePayer.SCHOLARSHIP,
+      guardian: FeePayer.GUARDIAN,
+      self: FeePayer.SELF,
+      other: FeePayer.OTHER,
+    };
+
+    return map[normalized] ?? FeePayer.OTHER;
+  }
+
+  private hasAnyEducationValue(levelData: any): boolean {
+    if (!levelData || typeof levelData !== 'object') return false;
+
+    return [
+      levelData.schoolName,
+      levelData.tuitionFee,
+      levelData.yearCompleted,
+      levelData.whoPaidFees,
+    ].some((value) => this.toOptionalString(value) !== undefined || this.toOptionalNumber(value) !== undefined);
+  }
+
+  private validateEducationSection(levelLabel: string, levelData: any) {
+    if (!this.hasAnyEducationValue(levelData)) return;
+
+    const missingFields: string[] = [];
+
+    if (!this.toOptionalString(levelData?.schoolName)) {
+      missingFields.push('school name');
+    }
+
+    if (this.toOptionalNumber(levelData?.tuitionFee) === undefined) {
+      missingFields.push('tuition fee');
+    }
+
+    if (this.toOptionalNumber(levelData?.yearCompleted) === undefined) {
+      missingFields.push('year completed');
+    }
+
+    if (!this.toOptionalString(levelData?.whoPaidFees)) {
+      missingFields.push('who paid fees');
+    }
+
+    if (missingFields.length > 0) {
+      throw new BadRequestException(
+        `${levelLabel} education is incomplete. Please provide ${missingFields.join(', ')}.`,
+      );
+    }
+  }
+
+  private normalizePersonalPayload(applicationData: any) {
+    const personal = applicationData.personal ?? {};
+    const payment = applicationData.payment ?? {};
+
+    return {
+      firstName: this.toOptionalString(personal.firstName) ?? '',
+      lastName: this.toOptionalString(personal.lastName) ?? this.toOptionalString(personal.surname) ?? '',
+      phoneNumber: this.toOptionalString(personal.phoneNumber) ?? '',
+      nationalIdNumber: this.toOptionalString(personal.nationalIdNumber) ?? this.toOptionalString(personal.nationalId) ?? '',
+      registrationNumber: this.toOptionalString(personal.registrationNumber) ?? '',
+      dateOfBirth: personal.dateOfBirth,
+      gender: (this.toOptionalString(personal.gender) as Gender | undefined) ?? Gender.MALE,
+      maritalStatus: (this.toOptionalString(personal.maritalStatus) as MaritalStatus | undefined) ?? MaritalStatus.SINGLE,
+      homeDistrict: this.toOptionalString(personal.homeDistrict) ?? '',
+      traditionalAuthority: this.toOptionalString(personal.traditionalAuthority) ?? this.toOptionalString(personal.ta) ?? '',
+      physicalAddress: this.toOptionalString(personal.physicalAddress) ?? '',
+      disability: this.mapDisability(personal.disability),
+      paymentMethod: this.toOptionalString(payment.paymentMethod),
+      paymentPhoneNumber: this.toOptionalString(payment.phoneNumber),
+      bankAccount: this.toOptionalString(payment.accountNumber),
+      accountName: this.toOptionalString(payment.accountName),
+      bankName: this.toOptionalString(payment.paymentMethod),
+    };
+  }
+
+  private normalizeFamilyPayload(family: any) {
+    return {
+      parentalStatus: this.toOptionalString(family?.parentalStatus),
+      fatherFirstName: this.toOptionalString(family?.fatherFirstName),
+      fatherSurname: this.toOptionalString(family?.fatherSurname),
+      fatherNationalId: this.toOptionalString(family?.fatherNationalId),
+      fatherPhone: this.toOptionalString(family?.fatherPhone),
+      fatherProfession: this.toOptionalString(family?.fatherProfession),
+      fatherMonthlyIncome: this.toOptionalNumber(family?.fatherMonthlyIncome),
+      fatherTa: this.toOptionalString(family?.fatherTa),
+      fatherResidentialAddress: this.toOptionalString(family?.fatherResidentialAddress),
+      fatherPostalAddress: this.toOptionalString(family?.fatherPostalAddress),
+      motherFirstName: this.toOptionalString(family?.motherFirstName),
+      motherSurname: this.toOptionalString(family?.motherSurname),
+      motherNationalId: this.toOptionalString(family?.motherNationalId),
+      motherPhone: this.toOptionalString(family?.motherPhone),
+      motherProfession: this.toOptionalString(family?.motherProfession),
+      motherMonthlyIncome: this.toOptionalNumber(family?.motherMonthlyIncome),
+      motherTa: this.toOptionalString(family?.motherTa),
+      motherResidentialAddress: this.toOptionalString(family?.motherResidentialAddress),
+      motherPostalAddress: this.toOptionalString(family?.motherPostalAddress),
+      parentFirstName: this.toOptionalString(family?.parentFirstName),
+      parentSurname: this.toOptionalString(family?.parentSurname),
+      parentNationalId: this.toOptionalString(family?.parentNationalId),
+      parentPhone: this.toOptionalString(family?.parentPhone),
+      parentMonthlyIncome: this.toOptionalNumber(family?.parentMonthlyIncome),
+      studentRelationship: this.toOptionalString(family?.studentRelationship),
+      parentTa: this.toOptionalString(family?.parentTa),
+      parentResidentialAddress: this.toOptionalString(family?.parentResidentialAddress),
+      parentPostalAddress: this.toOptionalString(family?.parentPostalAddress),
+      deceasedParentId: this.toOptionalString(family?.deceasedParentId),
+      guardianFirstName: this.toOptionalString(family?.guardianFirstName),
+      guardianLastName: this.toOptionalString(family?.guardianSurname),
+      guardianNationalId: this.toOptionalString(family?.guardianNationalId),
+      guardianPhone: this.toOptionalString(family?.guardianPhone),
+      guardianMonthlyIncome: this.toOptionalNumber(family?.guardianMonthlyIncome),
+      relationshipToGuardian: this.toOptionalString(family?.relationshipToGuardian),
+      guardianTa: this.toOptionalString(family?.guardianTa),
+      guardianResidentialAddress: this.toOptionalString(family?.guardianResidentialAddress),
+      guardianPostalAddress: this.toOptionalString(family?.guardianPostalAddress),
+      deceasedFatherId: this.toOptionalString(family?.deceasedFatherId),
+      deceasedMotherId: this.toOptionalString(family?.deceasedMotherId),
+      numberOfSiblings: this.toOptionalNumber(family?.numberOfSiblings),
+      numberStillInSchool: this.toOptionalNumber(family?.numberStillInSchool),
+      siblingsInPrimary: this.toOptionalNumber(family?.siblingsInPrimary),
+      siblingsInSecondary: this.toOptionalNumber(family?.siblingsInSecondary),
+      siblingsInTertiary: this.toOptionalNumber(family?.siblingsInTertiary),
+    };
+  }
+
+  private normalizeEducationPayload(levelData: any) {
+    return {
+      schoolName: this.toOptionalString(levelData?.schoolName) ?? '',
+      tuitionFees: this.toOptionalNumber(levelData?.tuitionFee) ?? 0,
+      yearCompleted: this.toOptionalNumber(levelData?.yearCompleted) ?? 0,
+      whoPaidFees: this.mapFeePayer(levelData?.whoPaidFees),
+    };
+  }
+
   // ========== GET ALL USER DATA FOR REVIEW ==========
   @Get('my-application')
   async getMyCompleteApplication(@Req() req) {
@@ -52,7 +225,7 @@ export class ReviewController {
       this.personalDetailService.findByUserId(userId).catch(() => null),
       this.academicDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
-      this.educationService.findByUserId(userId).catch(() => []),
+      this.educationService.findByUserId(userId).catch((): Education[] => []),
     ]);
 
     return {
@@ -219,190 +392,64 @@ export class ReviewController {
 @Post('submit-application')
 async submitFullApplication(@Req() req, @Body() applicationData: any) {
   const userId = await this.getUserIdFromRequest(req);
-  
-  console.log('=== SUBMIT APPLICATION ===');
-  console.log('User ID:', userId);
-  
+
   try {
-    // 1. Save personal details
     if (applicationData.personal) {
-      console.log('Saving personal details...');
-      
-      const personalData: any = {
-        firstName: applicationData.personal.firstName,
-        lastName: applicationData.personal.lastName || applicationData.personal.surname,
-        phoneNumber: applicationData.personal.phoneNumber,
-        nationalIdNumber: applicationData.personal.nationalIdNumber || applicationData.personal.nationalId,
-        registrationNumber: applicationData.personal.registrationNumber,
-        dateOfBirth: applicationData.personal.dateOfBirth,
-        gender: applicationData.personal.gender,
-        maritalStatus: applicationData.personal.maritalStatus,
-        homeDistrict: applicationData.personal.homeDistrict,
-        traditionalAuthority: applicationData.personal.traditionalAuthority || applicationData.personal.ta,
-        physicalAddress: applicationData.personal.physicalAddress,
-        userId: userId,
-      };
-      
-      if (applicationData.personal.disability && 
-          applicationData.personal.disability !== "None" && 
-          applicationData.personal.disability !== "") {
-        personalData.disability = applicationData.personal.disability;
-      }
-      
-      try {
-        await this.personalDetailService.create(userId, personalData);
-        console.log('Personal details created successfully');
-      } catch (error: any) {
-        if (error.message.includes('already exist')) {
-          const existing = await this.personalDetailService.findByUserId(userId);
-          await this.personalDetailService.update(existing.id, personalData);
-          console.log('Personal details updated successfully');
-        } else {
-          throw error;
-        }
-      }
+      const personalData = this.normalizePersonalPayload(applicationData);
+      await this.personalDetailService.upsertByUserId(userId, personalData as any);
     }
     
-    // 2. Save family details
     if (applicationData.family) {
-      console.log('Saving family details...');
-      
-      try {
-        await this.familyService.createFromParents(userId, applicationData.family);
-        console.log('Family details created successfully');
-      } catch (error: any) {
-        if (error.message.includes('already exists')) {
-          console.log('Family details already exist, skipping...');
-        } else {
-          console.error('Family service error:', error.message);
-        }
-      }
+      const familyData = this.normalizeFamilyPayload(applicationData.family);
+      await this.familyService.upsertByUserId(userId, familyData as any);
     }
     
-    // 3. Save academic details
-    if (applicationData.academics) {
-      console.log('Saving academic details...');
-      
-      const academicData: any = {
-        programOfStudy: applicationData.academics.programOfStudy || 'Not Provided',
-        department: applicationData.academics.department || 'Not Provided',
-        yearOfStudy: applicationData.academics.yearOfStudy || 1,
-        userId: userId,
+    const hasAcademicData = [
+      applicationData?.academics?.programOfStudy,
+      applicationData?.academics?.department,
+      applicationData?.academics?.yearOfStudy,
+    ].some((value) => this.toOptionalString(value) !== undefined || this.toOptionalNumber(value) !== undefined);
+
+    if (hasAcademicData) {
+      const academicData = {
+        programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
+        department: this.toOptionalString(applicationData.academics.department) ?? '',
+        yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
       };
-      
-      try {
-        await this.academicDetailService.create(userId, academicData);
-        console.log('Academic details created successfully');
-      } catch (error: any) {
-        if (error.message.includes('already exist')) {
-          const existing = await this.academicDetailService.findByUserId(userId);
-          await this.academicDetailService.update(existing.id, academicData);
-          console.log('Academic details updated successfully');
-        } else {
-          console.error('Academic service error:', error.message);
-        }
-      }
+      await this.academicDetailService.upsertByUserId(userId, academicData as any);
     }
+
+    this.validateEducationSection('Primary', applicationData.education?.primary);
+    this.validateEducationSection('Secondary', applicationData.education?.secondary);
+    this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
     
-   // 4. Save education details (Primary, Secondary, Tertiary)
-if (applicationData.education) {
-  console.log('Saving education details...');
-  
-  // Import FeePayer at the top of your file
-  // import { FeePayer } from '../entities/education.entity';
-  
-  // Helper function to map fee payer values from frontend to backend enum
-  const mapFeePayer = (feePayer: string): FeePayer => {
-    const map: Record<string, FeePayer> = {
-      'Mother': FeePayer.PARENT,
-      'Father': FeePayer.PARENT,
-      'Parent': FeePayer.PARENT,
-      'Parents': FeePayer.PARENT,
-      'Self': FeePayer.SELF,
-      'self': FeePayer.SELF,
-      'Ngo': FeePayer.SPONSOR,
-      'NGO': FeePayer.SPONSOR,
-      'Sponsor': FeePayer.SPONSOR,
-      'Scholarship': FeePayer.SCHOLARSHIP,
-      'Guardian': FeePayer.GUARDIAN,
-      'guardian': FeePayer.GUARDIAN,
-      'Other': FeePayer.OTHER,
-      'other': FeePayer.OTHER,
-    };
-    return map[feePayer] || FeePayer.OTHER;
-  };
-  
-  // Save Primary Education
-  if (applicationData.education.primary && applicationData.education.primary.schoolName) {
-    try {
-      const existingPrimary = await this.educationService.findByLevel(userId, 'primary' as any);
-      const primaryData = {
-        schoolName: applicationData.education.primary.schoolName,
-        tuitionFees: parseFloat(applicationData.education.primary.tuitionFee) || 0,
-        yearCompleted: parseInt(applicationData.education.primary.yearCompleted) || 0,
-        whoPaidFees: mapFeePayer(applicationData.education.primary.whoPaidFees),
-      };
-      
-      if (existingPrimary && existingPrimary.length > 0) {
-        await this.educationService.update(existingPrimary[0].id, primaryData);
-        console.log('Primary education updated');
-      } else {
-        await this.educationService.createPrimary(userId, primaryData);
-        console.log('Primary education created');
-      }
-    } catch (error: any) {
-      console.error('Primary education error:', error.message);
+    if (applicationData.education?.primary?.schoolName) {
+      await this.educationService.upsertByLevel(
+        userId,
+        EducationLevel.PRIMARY,
+        this.normalizeEducationPayload(applicationData.education.primary),
+      );
     }
-  }
-  
-  // Save Secondary Education
-  if (applicationData.education.secondary && applicationData.education.secondary.schoolName) {
-    try {
-      const existingSecondary = await this.educationService.findByLevel(userId, 'secondary' as any);
-      const secondaryData = {
-        schoolName: applicationData.education.secondary.schoolName,
-        tuitionFees: parseFloat(applicationData.education.secondary.tuitionFee) || 0,
-        yearCompleted: parseInt(applicationData.education.secondary.yearCompleted) || 0,
-        whoPaidFees: mapFeePayer(applicationData.education.secondary.whoPaidFees),
-      };
-      
-      if (existingSecondary && existingSecondary.length > 0) {
-        await this.educationService.update(existingSecondary[0].id, secondaryData);
-        console.log('Secondary education updated');
-      } else {
-        await this.educationService.createSecondary(userId, secondaryData);
-        console.log('Secondary education created');
-      }
-    } catch (error: any) {
-      console.error('Secondary education error:', error.message);
+
+    if (applicationData.education?.secondary?.schoolName) {
+      await this.educationService.upsertByLevel(
+        userId,
+        EducationLevel.SECONDARY,
+        this.normalizeEducationPayload(applicationData.education.secondary),
+      );
     }
-  }
-  
-  // Save Tertiary Education (optional)
-  if (applicationData.education.tertiary && applicationData.education.tertiary.schoolName) {
-    try {
-      const existingTertiary = await this.educationService.findByLevel(userId, 'tertiary' as any);
-      const tertiaryData = {
-        schoolName: applicationData.education.tertiary.schoolName,
-        tuitionFees: parseFloat(applicationData.education.tertiary.tuitionFee) || 0,
-        yearCompleted: parseInt(applicationData.education.tertiary.yearCompleted) || 0,
-        whoPaidFees: mapFeePayer(applicationData.education.tertiary.whoPaidFees),
-      };
-      
-      if (existingTertiary && existingTertiary.length > 0) {
-        await this.educationService.update(existingTertiary[0].id, tertiaryData);
-        console.log('Tertiary education updated');
-      } else {
-        await this.educationService.createTertiary(userId, tertiaryData);
-        console.log('Tertiary education created');
-      }
-    } catch (error: any) {
-      console.error('Tertiary education error:', error.message);
+
+    if (applicationData.education?.tertiary?.schoolName) {
+      await this.educationService.upsertByLevel(
+        userId,
+        EducationLevel.TERTIARY,
+        {
+          ...this.normalizeEducationPayload(applicationData.education.tertiary),
+          isSemesterBased: true,
+        },
+      );
     }
-  }
-}
-    
-    console.log('=== SUBMIT SUCCESS ===');
+
     return {
       success: true,
       message: 'Application submitted successfully!',
@@ -410,10 +457,8 @@ if (applicationData.education) {
       applicationStatus: 'pending_review',
     };
   } catch (error: any) {
-    console.error('=== SUBMIT ERROR ===');
-    console.error('Error message:', error.message);
     throw new BadRequestException({
-      message: 'Failed to submit application',
+      message: error?.message ?? 'Failed to submit application',
       error: error.message,
     });
   }

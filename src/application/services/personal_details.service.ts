@@ -48,6 +48,18 @@ export class PersonalDetailService {
     return saved;
   }
 
+  async upsertByUserId(userId: string, data: CreatePersonalDetailDto): Promise<PersonalDetails> {
+    const existingDetails = await this.personalDetailRepository.findOne({
+      where: { userId },
+    });
+
+    if (existingDetails) {
+      return await this.update(existingDetails.id, data);
+    }
+
+    return await this.create(userId, data);
+  }
+
   async findAll(): Promise<PersonalDetails[]> {
     return await this.personalDetailRepository.find({
       order: { createdAt: 'DESC' } as any,
@@ -138,6 +150,8 @@ export class PersonalDetailService {
     const personalDetail = await this.findByUserId(userId);
     
     if (paymentDto.paymentBranch !== undefined) personalDetail.paymentBranch = paymentDto.paymentBranch;
+    if ((paymentDto as any).paymentMethod !== undefined) personalDetail.paymentMethod = (paymentDto as any).paymentMethod;
+    if ((paymentDto as any).paymentPhoneNumber !== undefined) personalDetail.paymentPhoneNumber = (paymentDto as any).paymentPhoneNumber;
     if (paymentDto.bankName !== undefined) personalDetail.bankName = paymentDto.bankName;
     if (paymentDto.bankAccount !== undefined) personalDetail.bankAccount = paymentDto.bankAccount;
     if (paymentDto.accountName !== undefined) personalDetail.accountName = paymentDto.accountName;

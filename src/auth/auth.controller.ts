@@ -3,10 +3,21 @@ import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus }
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { Public } from './metadata';
+import { UserService } from '../user/user.service';
+import { CreateUserDto } from '../user/dto/create-user.dto';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly userService: UserService,
+  ) {}
+
+  @Public()
+  @Post('register')
+  async register(@Body() createUserDto: CreateUserDto) {
+    return this.userService.create(createUserDto);
+  }
 
   @Public()
   @Post('login')

@@ -8,12 +8,12 @@ export class User {
 
     @Column()
     firstName !: string;
-    @Column({ unique: true })  // Database level: allows NULL
-    registrationNumber !: string;
 
-    //i added this field to the user entity to be able to search for users by their registration number instead of email, which is more convenient for our use case. 
     @Column()
     lastName !: string;
+
+    @Column({ unique: true, nullable: true })
+    registrationNumber?: string;
 
     @Column({ unique: true })
     email !: string;
