@@ -40,7 +40,7 @@ export class UserService {
     const { password, ...result } = savedUser;
     return result;
   }
-
+//because ndinapanga zoti ma user onse amene akupanga register azikhala ndi role ya user by default not giving them chance to choose so im just seeding the admin
   async createAdmin() {
     const existingAdmin = await this.userRepository.findOneBy({
       email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
@@ -65,7 +65,7 @@ export class UserService {
       role: Role.Admin,
     });
     const savedAdmin = await this.userRepository.save(user);
-    console.log('✅ Admin user created successfully');
+    console.log('Admin user created successfully');
     return savedAdmin;
   }
 

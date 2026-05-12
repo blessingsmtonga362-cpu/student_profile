@@ -10,6 +10,7 @@ import { ReviewModule } from './application/modules/review.module';
 import { AdminModule } from './admin/admin.module';
 import { UserService } from './user/user.service';
 import { NotificationModule } from './notification/module/notification.module';
+import { SponsorModule } from './sponsor/sponsor.module';
 
 const envFilePath = join(process.cwd(), '.env');
 
@@ -76,13 +77,14 @@ function validateEnv(config: Record<string, string | undefined>) {
     ReviewModule,
     AdminModule,
     NotificationModule,
+    SponsorModule,
   ],
 })
 export class AppModule implements OnModuleInit {
   constructor(private userService: UserService) {}
 
   async onModuleInit() {
-    // Auto-seed admin user if it doesn't exist
+    // apapa i was just trying to auto-seed admin user if it doesn't exist
     try {
       await this.userService.createAdmin();
     } catch (error) {

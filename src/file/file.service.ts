@@ -73,4 +73,49 @@ export class FileService {
     const uploadPromises = files.map(file => this.uploadFile(file, subFolder));
     return Promise.all(uploadPromises);
   }
+
+  async uploadImageFile(
+    file: any,
+    subFolder: string = 'images',
+    customFilename?: string,
+  ): Promise<{ url: string; filename: string; originalName: string }> {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
+    if (!allowedTypes.has(file.mimetype)) {
+      throw new BadRequestException('Only PNG, JPG, JPEG, or WEBP images are allowed');
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new BadRequestException('Image size exceeds 5MB limit');
+    }
+
+    const folderPath = join(this.uploadDir, subFolder);
+    this.ensureDirectoryExists(folderPath);
+
+    const fileExtension = file.originalname.split('.').pop();
+    const uniqueFilename = customFilename
+      ? `${customFilename}-${Date.now()}.${fileExtension}`
+      : `${uuidv4()}-${Date.now()}.${fileExtension}`;
+
+    const filePath = join(folderPath, uniqueFilename);
+
+    await new Promise<void>((resolve, reject) => {
+      const writeStream = createWriteStream(filePath);
+      writeStream.write(file.buffer);
+      writeStream.end();
+      writeStream.on('finish', () => resolve());
+      writeStream.on('error', (error) => reject(error));
+    });
+
+    const url = `/uploads/${subFolder}/${uniqueFilename}`;
+    return {
+      url,
+      filename: uniqueFilename,
+      originalName: file.originalname,
+    };
+  }
 }

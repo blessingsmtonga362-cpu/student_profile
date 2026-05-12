@@ -7,6 +7,7 @@ import { ReviewModule } from 'src/application/modules/review.module';
 import { AcademicDetails } from 'src/application/entities/academic_details.entity';
 import { VerificationLog } from 'src/application/entities/verification-log.entity';
 import { NotificationModule } from 'src/notification/module/notification.module';
+import { UserModule } from 'src/user/user.module';
 
 @Module({
   controllers: [AdminController],
@@ -15,6 +16,7 @@ import { NotificationModule } from 'src/notification/module/notification.module'
     TypeOrmModule.forFeature([ProfileData, AcademicDetails, VerificationLog]),
     forwardRef(() => ReviewModule),
     NotificationModule,
+    UserModule,
   ],
   exports: [AdminService]
 })

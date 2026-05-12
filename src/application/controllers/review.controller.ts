@@ -132,6 +132,44 @@ export class ReviewController {
     }
   }
 
+  private hasAnyAcademicValue(academicData: any): boolean {
+    if (!academicData || typeof academicData !== 'object') return false;
+
+    return [
+      academicData.programOfStudy,
+      academicData.department,
+      academicData.yearOfStudy,
+    ].some((value) => this.toOptionalString(value) !== undefined || this.toOptionalNumber(value) !== undefined);
+  }
+
+  private validateAcademicSection(academicData: any) {
+    if (!this.hasAnyAcademicValue(academicData)) {
+      throw new BadRequestException(
+        'Academic details are required. Please provide program of study, department, and year of study.',
+      );
+    }
+
+    const missingFields: string[] = [];
+
+    if (!this.toOptionalString(academicData?.programOfStudy)) {
+      missingFields.push('program of study');
+    }
+
+    if (!this.toOptionalString(academicData?.department)) {
+      missingFields.push('department');
+    }
+
+    if (this.toOptionalNumber(academicData?.yearOfStudy) === undefined) {
+      missingFields.push('year of study');
+    }
+
+    if (missingFields.length > 0) {
+      throw new BadRequestException(
+        `Academic details are incomplete. Please provide ${missingFields.join(', ')}.`,
+      );
+    }
+  }
+
   private normalizePersonalPayload(applicationData: any) {
     const personal = applicationData.personal ?? {};
     const payment = applicationData.payment ?? {};
@@ -394,6 +432,11 @@ async submitFullApplication(@Req() req, @Body() applicationData: any) {
   const userId = await this.getUserIdFromRequest(req);
 
   try {
+    this.validateAcademicSection(applicationData.academics);
+    this.validateEducationSection('Primary', applicationData.education?.primary);
+    this.validateEducationSection('Secondary', applicationData.education?.secondary);
+    this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
+
     if (applicationData.personal) {
       const personalData = this.normalizePersonalPayload(applicationData);
       await this.personalDetailService.upsertByUserId(userId, personalData as any);
@@ -404,24 +447,12 @@ async submitFullApplication(@Req() req, @Body() applicationData: any) {
       await this.familyService.upsertByUserId(userId, familyData as any);
     }
     
-    const hasAcademicData = [
-      applicationData?.academics?.programOfStudy,
-      applicationData?.academics?.department,
-      applicationData?.academics?.yearOfStudy,
-    ].some((value) => this.toOptionalString(value) !== undefined || this.toOptionalNumber(value) !== undefined);
-
-    if (hasAcademicData) {
-      const academicData = {
-        programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
-        department: this.toOptionalString(applicationData.academics.department) ?? '',
-        yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
-      };
-      await this.academicDetailService.upsertByUserId(userId, academicData as any);
-    }
-
-    this.validateEducationSection('Primary', applicationData.education?.primary);
-    this.validateEducationSection('Secondary', applicationData.education?.secondary);
-    this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
+    const academicData = {
+      programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
+      department: this.toOptionalString(applicationData.academics.department) ?? '',
+      yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
+    };
+    await this.academicDetailService.upsertByUserId(userId, academicData as any);
     
     if (applicationData.education?.primary?.schoolName) {
       await this.educationService.upsertByLevel(
