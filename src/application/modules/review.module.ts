@@ -14,6 +14,7 @@ import { Education } from '../entities/education.entity';
 import { ApplicationSubmission } from '../entities/application_submission.entity';
 import { UserModule } from '../../user/user.module';
 import { AdminModule } from '../../admin/admin.module';
+import { NotificationModule } from '../../notification/module/notification.module';
 
 @Module({
   imports: [
@@ -25,7 +26,8 @@ import { AdminModule } from '../../admin/admin.module';
       ApplicationSubmission,
     ]),
     forwardRef(() => UserModule),
-    forwardRef(() => AdminModule),  
+    forwardRef(() => AdminModule),
+    forwardRef(() => NotificationModule),
   ],
   controllers: [ReviewController],
   providers: [

@@ -31,6 +31,12 @@ export class ApplicationSubmission {
   @Column({ name: 'application_reference', length: 100, nullable: true, unique: true })
   applicationReference: string;
 
+  @Column({ name: 'review_comments', type: 'text', nullable: true })
+  reviewComments: string;
+
+  @Column({ name: 'admin_id', type: 'uuid', nullable: true })
+  adminId: string;
+
   @Column({ name: 'can_resubmit', default: false })
   canResubmit: boolean;
 

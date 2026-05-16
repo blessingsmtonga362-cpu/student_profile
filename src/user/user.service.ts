@@ -241,4 +241,10 @@ export class UserService {
     const { password, ...profileDetails } = user;
     return profileDetails;
   }
+  async findAllAdmins(): Promise<User[]> {
+  return await this.userRepository.find({
+    where: { role: Role.Admin },
+    select: ['id', 'firstName', 'lastName', 'email'],
+  });
+}
 }
