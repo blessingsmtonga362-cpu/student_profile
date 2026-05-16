@@ -1,8 +1,7 @@
-// src/application/modules/review.module.ts
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReviewController } from '../controllers/review.controller';
-import { ReviewService } from '../services/reviewService';
+import { ReviewService } from '../services/review.service';
 import { PersonalDetailService } from '../services/personal_details.service';
 import { AcademicDetailService } from '../services/academic_details.service';
 import { FamilyService } from '../services/family.service';
@@ -24,7 +23,7 @@ import { UserModule } from '../../user/user.module';
       Education,
       ApplicationSubmission,
     ]),
-    UserModule, // Provides UserService
+    UserModule,
   ],
   controllers: [ReviewController],
   providers: [
@@ -33,7 +32,7 @@ import { UserModule } from '../../user/user.module';
     FamilyService,
     EducationService,
     ReviewService,
-    ApplicationSubmissionService, // ✅ Must be here
+    ApplicationSubmissionService,
   ],
   exports: [
     ReviewService,

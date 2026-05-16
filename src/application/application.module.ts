@@ -1,7 +1,6 @@
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ReviewModule } from './modules/review.module';  // ✅ Import ReviewModule
+import { ReviewModule } from './modules/review.module';
 import { PersonalDetails } from './entities/personal_details.entity';
 import { AcademicDetails } from './entities/academic_details.entity';
 import { Family } from './entities/family.entity';
@@ -33,7 +32,7 @@ import { AuthModule } from 'src/auth/auth.module';
     FileModule,
     UserModule,
     AuthModule,
-    ReviewModule,  //  Import ReviewModule
+    ReviewModule,
   ],
   controllers: [
     PersonalDetailController, 
@@ -41,7 +40,6 @@ import { AuthModule } from 'src/auth/auth.module';
     FamilyController,
     EducationController,
     DocumentUploadController,
-    
   ],
   providers: [
     PersonalDetailService, 
@@ -49,6 +47,7 @@ import { AuthModule } from 'src/auth/auth.module';
     FamilyService,
     EducationService,
     DocumentUploadService,
+  
   ],
   exports: [
     PersonalDetailService, 

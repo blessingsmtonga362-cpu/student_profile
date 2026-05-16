@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
+import { format, parse } from 'date-fns';
 
 export enum MaritalStatus {
   SINGLE = 'Single',
@@ -56,8 +57,15 @@ export class PersonalDetails {
   physicalAddress: string;
 
   @Column({ name: 'date_of_birth', nullable: false, type: 'date' })
-  dateOfBirth: Date;
+  private dateOfBirth: Date;
 
+
+  get formattedDateOfBirth(): string {
+    return format(this.dateOfBirth, 'yy/MM/dd');
+  }
+  set formattedDateOfBirth(value: string) {
+    this.dateOfBirth = parse(value, 'yy/MM/dd', new Date());
+  }
   @Column({ name: 'registration_number', nullable: false, unique: true, length: 50 })
   registrationNumber: string;
 

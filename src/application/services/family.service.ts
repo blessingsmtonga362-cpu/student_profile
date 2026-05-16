@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Family, EducationLevel } from '../entities/family.entity';
 import { CreateFamilyDto, UpdateFamilyDto } from '../dto/create_family.dto';
 
+
 @Injectable()
 export class FamilyService {
   constructor(
@@ -27,7 +28,37 @@ export class FamilyService {
     });
 
     return await this.familyRepository.save(family);
+  }// Add this method to FamilyService class
+async createFromGuarantor(userId: string, guarantorData: any): Promise<Family> {
+  const existingFamily = await this.familyRepository.findOne({
+    where: { userId }
+  });
+
+  if (existingFamily) {
+    // Update existing instead of throwing error
+    existingFamily.guardianFirstName = guarantorData.guarantorFullName.split(' ')[0] || 'Not Provided';
+    existingFamily.guardianLastName = guarantorData.guarantorFullName.split(' ').slice(1).join(' ') || 'Not Provided';
+    existingFamily.profession = guarantorData.relationshipToApplicant || 'Guardian';
+    existingFamily.residenceAddress = guarantorData.guarantorAddress || 'Not Provided';
+    existingFamily.postalAddress = guarantorData.guarantorAddress;
+    return await this.familyRepository.save(existingFamily);
   }
+
+  const family = this.familyRepository.create({
+    userId,
+    guardianFirstName: guarantorData.guarantorFullName.split(' ')[0] || 'Not Provided',
+    guardianLastName: guarantorData.guarantorFullName.split(' ').slice(1).join(' ') || 'Not Provided',
+    profession: guarantorData.relationshipToApplicant || 'Guardian',
+    dateOfBirth: new Date('1970-01-01'),
+    traditionalAuthority: 'Not Specified',
+    residenceAddress: guarantorData.guarantorAddress || 'Not Provided',
+    postalAddress: guarantorData.guarantorAddress,
+    levelOfEducation: EducationLevel.SECONDARY,
+    isActive: true,
+  });
+
+  return await this.familyRepository.save(family);
+}
 
   // New method: Create family from parent data (father/mother)
   async createFromParents(userId: string, familyData: any): Promise<Family> {
