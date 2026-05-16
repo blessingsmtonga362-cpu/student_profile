@@ -57,7 +57,7 @@ export class PersonalDetails {
   physicalAddress: string;
 
   @Column({ name: 'date_of_birth', nullable: false, type: 'date' })
-  private dateOfBirth: Date;
+  dateOfBirth: Date;
 
 
   get formattedDateOfBirth(): string {

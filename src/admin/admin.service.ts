@@ -5,7 +5,7 @@ import { ProfileData } from 'src/application/entities/profile_data';
 import { PersonalDetails } from 'src/application/entities/personal_details.entity';
 import { AcademicDetails } from 'src/application/entities/academic_details.entity';
 import { VerificationLog } from 'src/application/entities/verification-log.entity';
-import { ReviewService } from 'src/application/services/reviewService';
+import { ReviewService } from 'src/application/services/review.service';
 import { AdminApplicationReviewStatus, CreateAdminDto } from './dto/create-admin.dto';
 import { StudentNotificationService } from 'src/notification/service/studentNotification.service';
 import { NotificationPriority, NotificationType, UserRole } from 'src/notification/entity/studentNotification.entity';
