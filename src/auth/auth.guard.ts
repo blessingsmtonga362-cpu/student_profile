@@ -33,10 +33,14 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException();
     }
     try {
-      
       const payload = await this.jwtService.verifyAsync(token);
-     
-      request['user'] = payload;
+
+      request['user'] = {
+        ...payload,
+        id: payload.sub,
+        userId: payload.sub,
+        isAdmin: payload.role === 'admin',
+      };
     } catch {
       throw new UnauthorizedException();
     }

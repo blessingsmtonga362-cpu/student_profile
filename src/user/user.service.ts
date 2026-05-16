@@ -1,4 +1,4 @@
-// src/user/user.service.ts
+
 import {
   ConflictException,
   Injectable,
@@ -25,6 +25,31 @@ export class UserService {
     private readonly emailService: EmailService,
   ) {}
 
+  // ========== CREATE USER (DIRECT CREATION - NO OTP) ==========
+  async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
+    const existingUser = await this.userRepository.findOneBy({
+      email: createUserDto.email,
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Email is already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    
+    const user = this.userRepository.create({
+      ...createUserDto,
+      password: hashedPassword,
+      role: Role.User,
+      isEmailVerified: true, // Direct creation - already verified
+    });
+
+    const savedUser = await this.userRepository.save(user);
+    const { password, ...result } = savedUser;
+    return result;
+  }
+
+  // ========== REGISTER WITH OTP VERIFICATION ==========
   async register(createUser: CreateUserDto): Promise<{ message: string; email: string }> {
     const existingUser = await this.userRepository.findOneBy({
       email: createUser.email,
@@ -39,7 +64,7 @@ export class UserService {
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // ✅ Set expiry to EXACTLY 10 minutes from now
+    // Set expiry to EXACTLY 10 minutes from now
     const otpExpiry = new Date();
     otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
     otpExpiry.setSeconds(0);
@@ -65,6 +90,7 @@ export class UserService {
     };
   }
 
+  // ========== VERIFY OTP ==========
   async verifyOtp(email: string, otp: string): Promise<{ success: boolean; message: string; access_token?: string; user?: any }> {
     const user = await this.userRepository.findOneBy({ email });
     
@@ -80,7 +106,7 @@ export class UserService {
       throw new BadRequestException('Invalid verification code');
     }
     
-    // ✅ Check if OTP has expired (exactly 10 minutes)
+    // Check if OTP has expired (exactly 10 minutes)
     const now = new Date();
     if (user.otpExpiry && user.otpExpiry < now) {
       const expiredMinutes = Math.floor((now.getTime() - user.otpExpiry.getTime()) / 60000);
@@ -116,6 +142,7 @@ export class UserService {
     };
   }
 
+  // ========== RESEND OTP ==========
   async resendOtp(email: string): Promise<{ message: string }> {
     const user = await this.userRepository.findOneBy({ email });
     
@@ -130,7 +157,7 @@ export class UserService {
     // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // ✅ Reset expiry to 10 minutes from now
+    // Reset expiry to 10 minutes from now
     const otpExpiry = new Date();
     otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
     otpExpiry.setSeconds(0);
@@ -148,40 +175,62 @@ export class UserService {
     };
   }
 
+  // ========== CREATE ADMIN USER (FOR SEEDING) ==========
   async createAdmin() {
+    const existingAdmin = await this.userRepository.findOneBy({
+      email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
+    });
+
+    if (existingAdmin) {
+      console.log('Admin user already exists');
+      return existingAdmin;
+    }
+
     const hashedPassword = await bcrypt.hash(
       this.configService.get<string>('ADMIN_PASSWORD', 'bimto27'),
       10,
     );
+    
     const user = this.userRepository.create({
-      university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
       firstName: this.configService.get<string>('ADMIN_FIRST_NAME', 'blessings'),
       lastName: this.configService.get<string>('ADMIN_LAST_NAME', 'network'),
       email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
       password: hashedPassword,
+      university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
+      registrationNumber: this.configService.get<string>('ADMIN_REGISTRATION_NUMBER', 'ADMIN001'),
       role: Role.Admin,
+      isEmailVerified: true,
     });
-    return this.userRepository.save(user);
+    
+    const savedAdmin = await this.userRepository.save(user);
+    console.log('Admin user created successfully');
+    return savedAdmin;
   }
 
+  // ========== FIND ALL USERS ==========
   findAll(): Promise<User[]> {
     return this.userRepository.find();
   }
 
+  // ========== FIND USER BY EMAIL ==========
   findOne(email: string): Promise<User | null> {
     return this.userRepository.findOneBy({ email });
   }
 
-  async findByRegistrationNumber(registrationNumber: string) {
-    return await this.userRepository.findOne({ 
-      where: { registrationNumber: registrationNumber }
+  // ========== FIND USER BY REGISTRATION NUMBER ==========
+  async findByRegistrationNumber(registrationNumber: string): Promise<User | null> {
+    if (!registrationNumber) return null;
+    return await this.userRepository.findOne({
+      where: { registrationNumber },
     });
   }
 
+  // ========== FIND USER BY ID ==========
   async findById(id: string): Promise<User | null> {
     return this.userRepository.findOneBy({ id });
   }
 
+  // ========== GET USER PROFILE (EXCLUDING PASSWORD) ==========
   async profileDetails(userId: string): Promise<Omit<User, 'password'>> {
     const user = await this.userRepository.findOneBy({ id: userId });
 

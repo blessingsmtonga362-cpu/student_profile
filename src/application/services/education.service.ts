@@ -108,6 +108,30 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
     return await this.educationRepository.save(education);
   }
 
+  async upsertByLevel(
+    userId: string,
+    level: EducationLevel,
+    data: Partial<PrimaryEducationDto & SecondaryEducationDto & TertiaryEducationDto>,
+  ): Promise<Education> {
+    const existingRecords = await this.findByLevel(userId, level);
+    const existingRecord = existingRecords[0];
+
+    if (existingRecord) {
+      Object.assign(existingRecord, data);
+      return await this.educationRepository.save(existingRecord);
+    }
+
+    if (level === EducationLevel.PRIMARY) {
+      return await this.createPrimary(userId, data as PrimaryEducationDto);
+    }
+
+    if (level === EducationLevel.SECONDARY) {
+      return await this.createSecondary(userId, data as SecondaryEducationDto);
+    }
+
+    return await this.createTertiary(userId, data as TertiaryEducationDto);
+  }
+
   // Get all education records for a user
   async findByUserId(userId: string): Promise<Education[]> {
     return await this.educationRepository.find({
@@ -128,7 +152,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
   async findOne(id: string): Promise<Education> {
     const education = await this.educationRepository.findOne({
       where: { id },
-      relations: ['user'],
     });
 
     if (!education) {
@@ -198,7 +221,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
   // Admin methods
   async findAll(): Promise<Education[]> {
     return await this.educationRepository.find({
-      relations: ['user'],
       order: { createdAt: 'DESC' },
     });
   }

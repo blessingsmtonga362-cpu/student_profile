@@ -1,29 +1,50 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { UserService } from '../user/user.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { UserService } from '../user/user.service';
 
 const UNIMA_EMAIL_DOMAIN = '@unima.ac.mw';
 
 @Injectable()
-export class AuthService {  // Make sure 'export' is here
+export class AuthService {
   constructor(
     private userService: UserService,
     private jwtService: JwtService,
   ) {}
-async login(email: string, pass: string): Promise<any> {
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail.endsWith(UNIMA_EMAIL_DOMAIN)) {
-        throw new UnauthorizedException('Only University of Malawi email addresses are allowed');
-    }
-    const user = await this.userService.findOne(normalizedEmail);
-    if (!user ) {
-        throw new UnauthorizedException();
 
+  async login(email: string, password: string): Promise<any> {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail.endsWith(UNIMA_EMAIL_DOMAIN)) {
+      throw new UnauthorizedException(
+        'Only University of Malawi email addresses are allowed'
+      );
     }
-    
-    const payload = { email: user.email, sub: user.id, role: user.role };
-    
+
+    const user = await this.userService.findOne(normalizedEmail);
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const passwordMatched = await bcrypt.compare(password, user.password);
+    if (!passwordMatched) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedException('Please verify your email before logging in');
+    }
+
+    return this.generateToken(user);
+  }
+
+  private generateToken(user: any) {
+    const payload = {
+      email: user.email,
+      sub: user.id,
+      role: user.role,
+    };
+
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -33,16 +54,7 @@ async login(email: string, pass: string): Promise<any> {
         firstName: user.firstName,
         lastName: user.lastName,
         registrationNumber: user.registrationNumber,
-      }
+      },
     };
-  }
-
-  async validateUser(email: string, password: string) {
-    const user = await this.userService.findOne(email);
-    if (user && await bcrypt.compare(password, user.password)) {
-      const { password, ...result } = user;
-      return result;
-    }
-    return null;
   }
 }

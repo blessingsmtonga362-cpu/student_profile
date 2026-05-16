@@ -120,6 +120,22 @@ nationalIdFilename?: string;
 })
 paymentBranch?: string;
 
+@Column({
+  name: 'payment_method',
+  nullable: true,
+  length: 50,
+  type: 'varchar'
+})
+paymentMethod?: string;
+
+@Column({
+  name: 'payment_phone_number',
+  nullable: true,
+  length: 30,
+  type: 'varchar'
+})
+paymentPhoneNumber?: string;
+
 @Column({ 
   name: 'bank_name', 
   nullable: true, 

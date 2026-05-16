@@ -99,6 +99,14 @@ export class CreatePersonalDetailDto {
 
   @IsOptional()
   @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentPhoneNumber?: string;
+
+  @IsOptional()
+  @IsString()
   bankName?: string;
 
   @IsOptional()
@@ -124,6 +132,14 @@ export class UpdatePaymentDetailsDto {
   @IsOptional()
   @IsString()
   paymentBranch?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentPhoneNumber?: string;
 
   @IsOptional()
   @IsString()

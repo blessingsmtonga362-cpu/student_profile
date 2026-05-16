@@ -19,6 +19,7 @@ import { DocumentUploadService } from './services/document-upload.service';
 import { FileModule } from '../file/file.module';
 import { UserModule } from 'src/user/user.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { AdminModule } from 'src/admin/admin.module';
 
 @Module({
   imports: [
@@ -33,6 +34,8 @@ import { AuthModule } from 'src/auth/auth.module';
     UserModule,
     AuthModule,
     ReviewModule,
+    AdminModule,
+
   ],
   controllers: [
     PersonalDetailController, 

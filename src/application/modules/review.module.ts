@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReviewController } from '../controllers/review.controller';
 import { ReviewService } from '../services/review.service';
@@ -13,6 +13,7 @@ import { Family } from '../entities/family.entity';
 import { Education } from '../entities/education.entity';
 import { ApplicationSubmission } from '../entities/application_submission.entity';
 import { UserModule } from '../../user/user.module';
+import { AdminModule } from '../../admin/admin.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { UserModule } from '../../user/user.module';
       Education,
       ApplicationSubmission,
     ]),
-    UserModule,
+    forwardRef(() => UserModule),
+    forwardRef(() => AdminModule),  
   ],
   controllers: [ReviewController],
   providers: [

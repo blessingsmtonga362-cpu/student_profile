@@ -4,7 +4,6 @@ import { Repository } from 'typeorm';
 import { Family, EducationLevel } from '../entities/family.entity';
 import { CreateFamilyDto, UpdateFamilyDto } from '../dto/create_family.dto';
 
-
 @Injectable()
 export class FamilyService {
   constructor(
@@ -13,7 +12,6 @@ export class FamilyService {
   ) {}
 
   async create(userId: string, createDto: CreateFamilyDto): Promise<Family> {
-    // Check if family member already exists for this user
     const existingFamily = await this.familyRepository.findOne({
       where: { userId }
     });
@@ -28,68 +26,56 @@ export class FamilyService {
     });
 
     return await this.familyRepository.save(family);
-  }// Add this method to FamilyService class
-async createFromGuarantor(userId: string, guarantorData: any): Promise<Family> {
-  const existingFamily = await this.familyRepository.findOne({
-    where: { userId }
-  });
-
-  if (existingFamily) {
-    // Update existing instead of throwing error
-    existingFamily.guardianFirstName = guarantorData.guarantorFullName.split(' ')[0] || 'Not Provided';
-    existingFamily.guardianLastName = guarantorData.guarantorFullName.split(' ').slice(1).join(' ') || 'Not Provided';
-    existingFamily.profession = guarantorData.relationshipToApplicant || 'Guardian';
-    existingFamily.residenceAddress = guarantorData.guarantorAddress || 'Not Provided';
-    existingFamily.postalAddress = guarantorData.guarantorAddress;
-    return await this.familyRepository.save(existingFamily);
   }
 
-  const family = this.familyRepository.create({
-    userId,
-    guardianFirstName: guarantorData.guarantorFullName.split(' ')[0] || 'Not Provided',
-    guardianLastName: guarantorData.guarantorFullName.split(' ').slice(1).join(' ') || 'Not Provided',
-    profession: guarantorData.relationshipToApplicant || 'Guardian',
-    dateOfBirth: new Date('1970-01-01'),
-    traditionalAuthority: 'Not Specified',
-    residenceAddress: guarantorData.guarantorAddress || 'Not Provided',
-    postalAddress: guarantorData.guarantorAddress,
-    levelOfEducation: EducationLevel.SECONDARY,
-    isActive: true,
-  });
+  async upsertByUserId(userId: string, data: CreateFamilyDto): Promise<Family> {
+    const existingFamily = await this.familyRepository.findOne({
+      where: { userId },
+    });
 
-  return await this.familyRepository.save(family);
-}
+    if (existingFamily) {
+      Object.assign(existingFamily, data);
+      return await this.familyRepository.save(existingFamily);
+    }
 
-  // New method: Create family from parent data (father/mother)
+    const family = this.familyRepository.create({
+      userId,
+      ...data,
+    });
+
+    return await this.familyRepository.save(family);
+  }
+
   async createFromParents(userId: string, familyData: any): Promise<Family> {
-    // Check if family member already exists for this user
+    return this.upsertByUserId(userId, familyData);
+  }
+
+  async createFromGuarantor(userId: string, guarantorData: any): Promise<Family> {
     const existingFamily = await this.familyRepository.findOne({
       where: { userId }
     });
 
     if (existingFamily) {
-      throw new BadRequestException('Family member already exists for this user');
+      existingFamily.guardianFirstName = guarantorData.guarantorFullName?.split(' ')[0] || 'Not Provided';
+      existingFamily.guardianLastName = guarantorData.guarantorFullName?.split(' ').slice(1).join(' ') || 'Not Provided';
+      existingFamily.profession = guarantorData.relationshipToApplicant || 'Guardian';
+      existingFamily.residenceAddress = guarantorData.guarantorAddress || 'Not Provided';
+      existingFamily.postalAddress = guarantorData.guarantorAddress;
+      return await this.familyRepository.save(existingFamily);
     }
 
-    // Transform frontend parent data to backend guardian data
-    const transformedData = {
-      guardianFirstName: familyData.fatherFirstName || familyData.motherFirstName || 'Not Provided',
-      guardianLastName: familyData.fatherLastName || familyData.motherLastName || 'Not Provided',
-      profession: familyData.fatherProfession || familyData.motherProfession || 'Not Provided',
-      traditionalAuthority: familyData.fatherTa || familyData.motherTa || 'Not Provided',
-      residenceAddress: familyData.fatherResidentialAddress || familyData.motherResidentialAddress || 'Not Provided',
-      postalAddress: familyData.fatherPostalAddress || familyData.motherPostalAddress || 'Not Provided',
-      dateOfBirth: new Date(),
-      userId: userId,
-    };
-    
-    // Add optional fields if they exist
-    if (familyData.fatherPhone) {
-      (transformedData as any).phoneNumber = familyData.fatherPhone;
-    }
-    
-    // ✅ Fixed: Only pass transformedData (it already contains userId)
-    const family = this.familyRepository.create(transformedData);
+    const family = this.familyRepository.create({
+      userId,
+      guardianFirstName: guarantorData.guarantorFullName?.split(' ')[0] || 'Not Provided',
+      guardianLastName: guarantorData.guarantorFullName?.split(' ').slice(1).join(' ') || 'Not Provided',
+      profession: guarantorData.relationshipToApplicant || 'Guardian',
+      dateOfBirth: new Date('1970-01-01'),
+      traditionalAuthority: 'Not Specified',
+      residenceAddress: guarantorData.guarantorAddress || 'Not Provided',
+      postalAddress: guarantorData.guarantorAddress,
+      levelOfEducation: EducationLevel.SECONDARY,
+      isActive: true,
+    });
 
     return await this.familyRepository.save(family);
   }

@@ -29,9 +29,21 @@ export class AcademicDetailService {
     return await this.academicDetailRepository.save(academicDetail);
   }
 
+  async upsertByUserId(userId: string, data: CreateAcademicDetailDto): Promise<AcademicDetails> {
+    const existingDetails = await this.academicDetailRepository.findOne({
+      where: { userId },
+    });
+
+    if (existingDetails) {
+      Object.assign(existingDetails, data);
+      return await this.academicDetailRepository.save(existingDetails);
+    }
+
+    return await this.create(userId, data);
+  }
+
   async findAll(): Promise<AcademicDetails[]> {
     return await this.academicDetailRepository.find({
-      relations: ['user'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -39,7 +51,6 @@ export class AcademicDetailService {
   async findOne(id: string): Promise<AcademicDetails> {
     const academicDetail = await this.academicDetailRepository.findOne({
       where: { id },
-      relations: ['user'],
     });
 
     if (!academicDetail) {
@@ -52,7 +63,6 @@ export class AcademicDetailService {
   async findByUserId(userId: string): Promise<AcademicDetails> {
     const academicDetail = await this.academicDetailRepository.findOne({
       where: { userId },
-      relations: ['user'],
     });
 
     if (!academicDetail) {
