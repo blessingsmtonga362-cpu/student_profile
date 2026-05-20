@@ -14,6 +14,7 @@ import * as bcrypt from 'bcrypt';
 import { Role } from '../auth/role.enum';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../email/email.service';
+import { UserRole } from 'src/notification/entity/studentNotification.entity';
 
 @Injectable()
 export class UserService {
@@ -242,9 +243,8 @@ export class UserService {
     return profileDetails;
   }
   async findAllAdmins(): Promise<User[]> {
-  return await this.userRepository.find({
-    where: { role: Role.Admin },
-    select: ['id', 'firstName', 'lastName', 'email'],
+  return this.userRepository.find({ 
+    where: { role: Role.Admin }
   });
 }
 }

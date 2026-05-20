@@ -66,10 +66,10 @@ function validateEnv(config: Record<string, string | undefined>) {
         port: Number(configService.get<string>('DB_PORT', '5432')),
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', '2001'),
-        database: configService.get<string>('DB_NAME', 'student-db'), // ✅ Changed from DB_DATABASE to DB_NAME
+        database: configService.get<string>('DB_NAME', 'student-db'), // 
         autoLoadEntities: true,
-        synchronize: configService.get<string>('DB_SYNC', 'true') === 'true', // ✅ Changed to match your .env
-        logging: configService.get<string>('DB_LOGGING', 'true') === 'true', // ✅ Add this
+        synchronize: configService.get<string>('DB_SYNC', 'true') === 'true',
+        logging: configService.get<string>('DB_LOGGING', 'true') === 'true',
       }),
     }),
     UserModule,
