@@ -61,10 +61,10 @@ export class PersonalDetails {
 
 
   get formattedDateOfBirth(): string {
-    return format(this.dateOfBirth, 'yy/MM/dd');
+    return format(this.dateOfBirth, 'dd/MM/yyyy');
   }
   set formattedDateOfBirth(value: string) {
-    this.dateOfBirth = parse(value, 'yy/MM/dd', new Date());
+    this.dateOfBirth = parse(value, 'dd/MM/yyyy', new Date());
   }
   @Column({ name: 'registration_number', nullable: false, unique: true, length: 50 })
   registrationNumber: string;
@@ -131,7 +131,7 @@ paymentMethod?: string;
 @Column({
   name: 'payment_phone_number',
   nullable: true,
-  length: 30,
+  length: 10,
   type: 'varchar'
 })
 paymentPhoneNumber?: string;
