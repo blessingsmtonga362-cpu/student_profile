@@ -9,10 +9,76 @@ import {
   MaxLength,
   IsUrl,
   IsNotEmpty,
-  Matches
+  Matches,
+  ValidateIf,
+  registerDecorator,
+  ValidationOptions,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { MaritalStatus, Gender, Disability } from '../entities/personal_details.entity';
+
+// validating number
+@ValidatorConstraint({ async: false })
+export class PaymentPhoneConstraint implements ValidatorConstraintInterface {
+  validate(phoneNumber: string, args: ValidationArguments) {
+    const object = args.object as any;
+    const paymentMethod = object.paymentMethod;
+    
+    if (!phoneNumber) return true; // Allow empty if not required
+    
+    // Remove any non-digit characters
+    const cleanedNumber = phoneNumber.replace(/\D/g, '');
+    
+    // Take last 10 digits (in case user includes country code)
+    const last10Digits = cleanedNumber.slice(-10);
+    
+    // tnm mpamba izitheke nd 08 kmaso akhala 10 numbers
+    if (paymentMethod === 'tnm' || paymentMethod === 'tnm_mpamba') {
+      return /^08\d{8}$/.test(last10Digits);
+    }
+    
+    // Airtel Money izitheke ndi 09 kmaso akhala 10 numbers
+    if (paymentMethod === 'airtel' || paymentMethod === 'airtel_money') {
+      return /^09\d{8}$/.test(last10Digits);
+    }
+    return true;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    const object = args.object as any;
+    const paymentMethod = object.paymentMethod;
+    
+    if (paymentMethod === 'tnm' || paymentMethod === 'tnm_mpamba') {
+      return 'TNM Mpamba number must start with 08 and be exactly 10 digits long (e.g., 0886663959)';
+    }
+    if (paymentMethod === 'airtel' || paymentMethod === 'airtel_money') {
+      return 'Airtel Money number must start with 09 and be exactly 10 digits long (e.g., 0996663959)';
+    }
+    return 'Invalid phone number format for selected payment method';
+  }
+}
+
+export function IsPaymentPhone(validationOptions?: ValidationOptions) {
+  return function (object: Object, propertyName: string) {
+    registerDecorator({
+      target: object.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      constraints: [],
+      validator: PaymentPhoneConstraint,
+    });
+  };
+}
+
+export enum PaymentMethod {
+  AIRTEL_MONEY = 'airtel',
+  TNM_MPAMBA = 'tnm',
+  NATIONAL_BANK = 'national',
+  STANDARD_BANK = 'standard',
+}
 
 export class CreatePersonalDetailDto {
   @IsString()
@@ -64,7 +130,6 @@ export class CreatePersonalDetailDto {
   })
   registrationNumber: string;
 
-  // ✅ FIX: Only ONE disability declaration - make it optional
   @IsOptional()
   @IsEnum(Disability)
   disability?: Disability;
@@ -98,10 +163,11 @@ export class CreatePersonalDetailDto {
   paymentBranch?: string;
 
   @IsOptional()
-  @IsString()
-  paymentMethod?: string;
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 
-  @IsOptional()
+  @ValidateIf(o => o.paymentMethod === PaymentMethod.AIRTEL_MONEY || o.paymentMethod === PaymentMethod.TNM_MPAMBA)
+  @IsPaymentPhone()
   @IsString()
   paymentPhoneNumber?: string;
 
@@ -134,10 +200,11 @@ export class UpdatePaymentDetailsDto {
   paymentBranch?: string;
 
   @IsOptional()
-  @IsString()
-  paymentMethod?: string;
+  @IsEnum(PaymentMethod)
+  paymentMethod?: PaymentMethod;
 
-  @IsOptional()
+  @ValidateIf(o => o.paymentMethod === PaymentMethod.AIRTEL_MONEY || o.paymentMethod === PaymentMethod.TNM_MPAMBA)
+  @IsPaymentPhone()
   @IsString()
   paymentPhoneNumber?: string;
 

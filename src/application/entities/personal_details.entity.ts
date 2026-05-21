@@ -41,7 +41,7 @@ export class PersonalDetails {
   @Column({ name: 'last_name', nullable: false, length: 100 })
   lastName: string;
 
-  @Column({ name: 'phone_number', nullable: false, length: 20 })
+  @Column({ name: 'phone_number', nullable: false, length: 10 })
   phoneNumber: string;
 
   @Column({ name: 'national_id_number', nullable: false, unique: true, length: 50 })
@@ -115,7 +115,7 @@ nationalIdFilename?: string;
 @Column({ 
   name: 'payment_branch', 
   nullable: true, 
-  length: 100,
+  length: 20,
   type: 'varchar'
 })
 paymentBranch?: string;
@@ -123,7 +123,7 @@ paymentBranch?: string;
 @Column({
   name: 'payment_method',
   nullable: true,
-  length: 50,
+  length: 20,
   type: 'varchar'
 })
 paymentMethod?: string;
@@ -139,7 +139,7 @@ paymentPhoneNumber?: string;
 @Column({ 
   name: 'bank_name', 
   nullable: true, 
-  length: 100,
+  length: 20,
   type: 'varchar'
 })
 bankName?: string;
@@ -147,7 +147,7 @@ bankName?: string;
 @Column({ 
   name: 'bank_account', 
   nullable: true, 
-  length: 50,
+  length: 15,
   type: 'varchar'
 })
 bankAccount?: string;
@@ -155,7 +155,7 @@ bankAccount?: string;
 @Column({ 
   name: 'account_name', 
   nullable: true, 
-  length: 100,
+  length: 20,
   type: 'varchar'
 })
 accountName?: string;
