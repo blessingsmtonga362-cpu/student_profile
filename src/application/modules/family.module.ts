@@ -7,7 +7,7 @@ import { FileModule } from '../../file/file.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Family]), // Register the entity
+    TypeOrmModule.forFeature([Family]),
     FileModule,
   ],
   controllers: [FamilyController],

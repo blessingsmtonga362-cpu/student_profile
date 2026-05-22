@@ -2,7 +2,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt'; // ✅ Add this import
+import { JwtModule } from '@nestjs/jwt';
 import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { User } from './entities/user.entity';
@@ -12,7 +12,7 @@ import { EmailModule } from 'src/email/email.module';
   imports: [
     TypeOrmModule.forFeature([User]),
     ConfigModule,
-    JwtModule.registerAsync({ // ✅ Add JWT registration
+    JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET', 'your-secret-key'),
         signOptions: { expiresIn: '7d' },
@@ -23,7 +23,7 @@ import { EmailModule } from 'src/email/email.module';
   ],
   controllers: [UserController],
   providers: [UserService],
-  exports: [UserService, JwtModule], // ✅ Export JwtModule for other modules
+  exports: [UserService, JwtModule],
 })
 export class UserModule {}
 /*
