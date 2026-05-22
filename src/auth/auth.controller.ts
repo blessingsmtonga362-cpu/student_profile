@@ -45,6 +45,7 @@ export class AuthController {
   getProfile(@Request() req) {
     return req.user;
   }
+  
 }
 /*
 import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
