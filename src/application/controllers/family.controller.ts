@@ -159,4 +159,5 @@ export class FamilyController {
   async removeById(@Param('id') id: string) {
     return await this.familyService.remove(id);
   }
+  
 }

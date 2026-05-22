@@ -32,18 +32,18 @@ export class Education {
   })
   educationLevel: EducationLevel;
 
-  // Common fields for all education levels
+
   @Column({ name: 'school_name', nullable: false, length: 255 })
   schoolName: string;
 
-  @Column({ name: 'tuition_fees', type: 'decimal', precision: 10, scale: 2, nullable: false })
+  @Column({ name: 'tuitionFees', type: 'decimal', precision: 10, scale: 2, nullable: false })
   tuitionFees: number;
 
   @Column({ name: 'year_completed', type: 'integer', nullable: false })
   yearCompleted: number;
 
   @Column({
-    name: 'who_paid_fees',
+    name: 'whoPaidFees',
     type: 'enum',
     enum: FeePayer,
     nullable: false

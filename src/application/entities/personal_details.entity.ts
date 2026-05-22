@@ -35,22 +35,22 @@ export class PersonalDetails {
   userId: string;
 
   // Basic Information
-  @Column({ name: 'first_name', nullable: false, length: 100 })
+  @Column({ name: 'first_name', nullable: false, length: 15 })
   firstName: string;
 
-  @Column({ name: 'last_name', nullable: false, length: 100 })
+  @Column({ name: 'last_name', nullable: false, length: 15 })
   lastName: string;
 
   @Column({ name: 'phone_number', nullable: false, length: 10 })
   phoneNumber: string;
 
-  @Column({ name: 'national_id_number', nullable: false, unique: true, length: 50 })
+  @Column({ name: 'national_id_number', nullable: false, unique: true, length: 10 })
   nationalIdNumber: string;
 
-  @Column({ name: 'home_district', nullable: false, length: 100 })
+  @Column({ name: 'home_district', nullable: false, length: 20 })
   homeDistrict: string;
 
-  @Column({ name: 'traditional_authority', nullable: false, length: 100 })
+  @Column({ name: 'traditional_authority', nullable: false, length: 20 })
   traditionalAuthority: string;
 
   @Column({ name: 'physical_address', nullable: false, type: 'text' })
@@ -66,7 +66,7 @@ export class PersonalDetails {
   set formattedDateOfBirth(value: string) {
     this.dateOfBirth = parse(value, 'dd/MM/yyyy', new Date());
   }
-  @Column({ name: 'registration_number', nullable: false, unique: true, length: 50 })
+  @Column({ name: 'registration_number', nullable: false, unique: true, length: 15 })
   registrationNumber: string;
 
   @Column({ 
@@ -74,7 +74,7 @@ export class PersonalDetails {
   type: 'enum', 
   enum: Disability, 
   default: Disability.NONE,
-  enumName: 'disability_enum'  // Add this
+  enumName: 'disability_enum'
 })
 disability: Disability;
 

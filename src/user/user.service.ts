@@ -1,4 +1,4 @@
-
+// src/user/user.service.ts
 import {
   ConflictException,
   Injectable,
@@ -14,7 +14,6 @@ import * as bcrypt from 'bcrypt';
 import { Role } from '../auth/role.enum';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../email/email.service';
-import { UserRole } from 'src/notification/entity/studentNotification.entity';
 
 @Injectable()
 export class UserService {
@@ -48,6 +47,30 @@ export class UserService {
     const savedUser = await this.userRepository.save(user);
     const { password, ...result } = savedUser;
     return result;
+  }
+
+  // ========== CREATE PENDING USER (WITH OTP) ==========
+  async createPendingUser(createUserDto: CreateUserDto, otp: string, otpExpiry: Date): Promise<User> {
+    const existingUser = await this.userRepository.findOneBy({
+      email: createUserDto.email,
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Email is already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    
+    const user = this.userRepository.create({
+      ...createUserDto,
+      password: hashedPassword,
+      role: Role.User,
+      otp: otp,
+      otpExpiry: otpExpiry,
+      isEmailVerified: false,
+    });
+    
+    return await this.userRepository.save(user);
   }
 
   // ========== REGISTER WITH OTP VERIFICATION ==========
@@ -107,7 +130,7 @@ export class UserService {
       throw new BadRequestException('Invalid verification code');
     }
     
-    // Check if OTP has expired (exactly 10 minutes)
+    // Check if OTP has expired
     const now = new Date();
     if (user.otpExpiry && user.otpExpiry < now) {
       const expiredMinutes = Math.floor((now.getTime() - user.otpExpiry.getTime()) / 60000);
@@ -135,12 +158,21 @@ export class UserService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: user.role === 'admin' ? 'admin' : 'student',
         firstName: user.firstName,
         lastName: user.lastName,
         registrationNumber: user.registrationNumber,
       },
     };
+  }
+
+  // ========== VERIFY EMAIL (by userId) ==========
+  async verifyEmail(userId: string): Promise<void> {
+    await this.userRepository.update(userId, {
+      isEmailVerified: true,
+      otp: null as any,
+      otpExpiry: null as any,
+    });
   }
 
   // ========== RESEND OTP ==========
@@ -176,6 +208,49 @@ export class UserService {
     };
   }
 
+  // ========== UPDATE OTP ==========
+  async updateOtp(userId: string, otp: string, otpExpiry: Date): Promise<void> {
+    await this.userRepository.update(userId, {
+      otp: otp,
+      otpExpiry: otpExpiry,
+    });
+  }
+
+  // ========== FIND USER BY EMAIL ==========
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { email } });
+  }
+
+  // ========== FIND USER BY ID ==========
+  async findById(id: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { id } });
+  }
+
+  // ========== FIND ALL ADMINS ==========
+  async findAllAdmins(): Promise<User[]> {
+    return this.userRepository.find({ 
+      where: { role: Role.Admin }
+    });
+  }
+
+  // ========== FIND ALL USERS ==========
+  findAll(): Promise<User[]> {
+    return this.userRepository.find();
+  }
+
+  // ========== FIND USER BY EMAIL (alias for consistency) ==========
+  findOne(email: string): Promise<User | null> {
+    return this.userRepository.findOneBy({ email });
+  }
+
+  // ========== FIND USER BY REGISTRATION NUMBER ==========
+  async findByRegistrationNumber(registrationNumber: string): Promise<User | null> {
+    if (!registrationNumber) return null;
+    return await this.userRepository.findOne({
+      where: { registrationNumber },
+    });
+  }
+
   // ========== CREATE ADMIN USER (FOR SEEDING) ==========
   async createAdmin() {
     const existingAdmin = await this.userRepository.findOneBy({
@@ -208,29 +283,6 @@ export class UserService {
     return savedAdmin;
   }
 
-  // ========== FIND ALL USERS ==========
-  findAll(): Promise<User[]> {
-    return this.userRepository.find();
-  }
-
-  // ========== FIND USER BY EMAIL ==========
-  findOne(email: string): Promise<User | null> {
-    return this.userRepository.findOneBy({ email });
-  }
-
-  // ========== FIND USER BY REGISTRATION NUMBER ==========
-  async findByRegistrationNumber(registrationNumber: string): Promise<User | null> {
-    if (!registrationNumber) return null;
-    return await this.userRepository.findOne({
-      where: { registrationNumber },
-    });
-  }
-
-  // ========== FIND USER BY ID ==========
-  async findById(id: string): Promise<User | null> {
-    return this.userRepository.findOneBy({ id });
-  }
-
   // ========== GET USER PROFILE (EXCLUDING PASSWORD) ==========
   async profileDetails(userId: string): Promise<Omit<User, 'password'>> {
     const user = await this.userRepository.findOneBy({ id: userId });
@@ -242,9 +294,4 @@ export class UserService {
     const { password, ...profileDetails } = user;
     return profileDetails;
   }
-  async findAllAdmins(): Promise<User[]> {
-  return this.userRepository.find({ 
-    where: { role: Role.Admin }
-  });
-}
 }

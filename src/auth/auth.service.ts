@@ -1,6 +1,7 @@
+// src/auth/auth.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { UserService } from '../user/user.service';
 import { JwtService } from '@nestjs/jwt';
+import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcrypt';
 
 const UNIMA_EMAIL_DOMAIN = '@unima.ac.mw';
@@ -15,26 +16,31 @@ export class AuthService {
   async login(email: string, password: string): Promise<any> {
     const normalizedEmail = email.trim().toLowerCase();
 
+    // Validate email domain
     if (!normalizedEmail.endsWith(UNIMA_EMAIL_DOMAIN)) {
       throw new UnauthorizedException(
         'Only University of Malawi email addresses are allowed'
       );
     }
 
-    const user = await this.userService.findOne(normalizedEmail);
+    // Find user by email
+    const user = await this.userService.findByEmail(normalizedEmail);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const passwordMatched = await bcrypt.compare(password, user.password);
-    if (!passwordMatched) {
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if email is verified
     if (!user.isEmailVerified) {
-      throw new UnauthorizedException('Please verify your email before logging in');
+      throw new UnauthorizedException('Please verify your email before logging in. Check your inbox for the OTP code.');
     }
 
+    // Generate and return token
     return this.generateToken(user);
   }
 
@@ -50,7 +56,7 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        role: user.role,
+        role: user.role === 'admin' ? 'admin' : 'student',
         firstName: user.firstName,
         lastName: user.lastName,
         registrationNumber: user.registrationNumber,

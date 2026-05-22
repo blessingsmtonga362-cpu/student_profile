@@ -84,13 +84,13 @@ export class CreatePersonalDetailDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
-  @MaxLength(100)
+  @MaxLength(15)
   firstName: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
-  @MaxLength(100)
+  @MaxLength(15)
   lastName: string;
 
   @IsPhoneNumber()
@@ -100,19 +100,19 @@ export class CreatePersonalDetailDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(5)
-  @MaxLength(50)
+  @MaxLength(10)
   nationalIdNumber: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
-  @MaxLength(100)
+  @MaxLength(20)
   homeDistrict: string;
 
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
-  @MaxLength(100)
+  @MaxLength(20)
   traditionalAuthority: string;
 
   @IsString()

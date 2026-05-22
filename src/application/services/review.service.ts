@@ -334,7 +334,7 @@ export class ReviewService {
   private validateFamilyDetails(family: Family): string[] {
     const missingFields: string[] = [];
     if (!family.guardianFirstName) missingFields.push('Guardian First Name');
-    if (!family.guardianLastName) missingFields.push('Guardian Last Name');
+    if (!family.guardianSurname) missingFields.push('Guardian Surname');
     if (!family.profession) missingFields.push('Profession');
     if (!family.dateOfBirth) missingFields.push('Date of Birth');
     if (!family.residenceAddress) missingFields.push('Residence Address');
