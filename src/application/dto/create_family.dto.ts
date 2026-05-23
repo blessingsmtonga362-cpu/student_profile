@@ -7,6 +7,8 @@ import {
   IsUrl,
   IsInt,
   Min,
+  Length,
+  Matches,
   registerDecorator,
   ValidationOptions,
   ValidatorConstraint,
@@ -80,6 +82,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Father\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Father\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   fatherPhone?: string;
 
   @IsOptional()
@@ -118,6 +124,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Mother\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Mother\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   motherPhone?: string;
 
   @IsOptional()
@@ -156,6 +166,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Parent\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Parent\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   parentPhone?: string;
 
   @IsOptional()
@@ -198,6 +212,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Guardian\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Guardian\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   guardianPhone?: string;
 
   @IsOptional()

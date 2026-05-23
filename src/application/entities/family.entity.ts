@@ -1,5 +1,6 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { User } from '../../user/entities/user.entity';
+import { BadRequestException } from '@nestjs/common';
 
 export enum EducationLevel {
   PRIMARY = 'primary',
@@ -199,6 +200,27 @@ export class Family {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  // Phone number validation methods
+  private validatePhoneNumber(phone: string | undefined, fieldName: string): void {
+    if (!phone) return;
+    
+    const phoneRegex = /^0[89][0-9]{8}$/;
+    if (!phoneRegex.test(phone)) {
+      throw new BadRequestException(
+        `${fieldName} must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)`
+      );
+    }
+  }
+
+  @BeforeInsert()
+  @BeforeUpdate()
+  validatePhoneNumbers() {
+    this.validatePhoneNumber(this.fatherPhone, "Father's phone number");
+    this.validatePhoneNumber(this.motherPhone, "Mother's phone number");
+    this.validatePhoneNumber(this.parentPhone, "Parent's phone number");
+    this.validatePhoneNumber(this.guardianPhone, "Guardian's phone number");
+  }
 
   // Relationships
   //@ManyToOne(() => User, user => user.family)
