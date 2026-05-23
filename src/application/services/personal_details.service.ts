@@ -14,14 +14,28 @@ export class PersonalDetailService {
     private readonly adminService: AdminService
   ) {}
 
-  // Add this validation method
+  // Validate main phone number (required field)
+  private validatePhoneNumber(phoneNumber: string): void {
+    if (!phoneNumber) {
+      throw new BadRequestException('Phone number is required');
+    }
+    
+    const cleanedNumber = phoneNumber.replace(/\D/g, '');
+    const last10Digits = cleanedNumber.slice(-10);
+    const phoneRegex = /^0[89][0-9]{8}$/;
+    
+    if (!phoneRegex.test(last10Digits)) {
+      throw new BadRequestException(
+        'Phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)'
+      );
+    }
+  }
+
+  // Validate payment phone number (conditional based on payment method)
   private validatePaymentPhone(paymentMethod: string, phoneNumber: string): void {
     if (!phoneNumber) return;
     
-    // Remove any non-digit characters (if user enters +265 or spaces)
     const cleanedNumber = phoneNumber.replace(/\D/g, '');
-    
-    // Take last 10 digits (in case user includes country code 265)
     const last10Digits = cleanedNumber.slice(-10);
     
     if (paymentMethod === 'tnm' || paymentMethod === 'tnm_mpamba') {
@@ -51,13 +65,12 @@ export class PersonalDetailService {
     }
   }
 
-  // Helper method to validate before any payment update
+  // Helper method to validate payment details
   private validatePaymentDetails(paymentMethod?: string, paymentPhoneNumber?: string): void {
     if (paymentMethod && paymentPhoneNumber) {
       this.validatePaymentPhone(paymentMethod, paymentPhoneNumber);
     }
     
-    // If only phone number is provided without payment method, we can't validate
     if (!paymentMethod && paymentPhoneNumber) {
       throw new BadRequestException(
         'Payment method is required when providing payment phone number'
@@ -66,7 +79,8 @@ export class PersonalDetailService {
   }
 
   async create(userId: string, createDto: CreatePersonalDetailDto): Promise<PersonalDetails> {
-    // Validate payment details before creating
+    // Validate all phone numbers before creating
+    this.validatePhoneNumber(createDto.phoneNumber);
     this.validatePaymentDetails(createDto.paymentMethod, createDto.paymentPhoneNumber);
 
     const existingDetails = await this.personalDetailRepository.findOne({
@@ -104,7 +118,10 @@ export class PersonalDetailService {
   }
 
   async upsertByUserId(userId: string, data: CreatePersonalDetailDto): Promise<PersonalDetails> {
-    // Validate payment details before upsert
+    // Validate phone numbers before upsert
+    if (data.phoneNumber) {
+      this.validatePhoneNumber(data.phoneNumber);
+    }
     this.validatePaymentDetails(data.paymentMethod, data.paymentPhoneNumber);
 
     const existingDetails = await this.personalDetailRepository.findOne({
@@ -151,7 +168,12 @@ export class PersonalDetailService {
   async update(id: string, updateDto: UpdatePersonalDetailDto): Promise<PersonalDetails> {
     const personalDetail = await this.findOne(id);
     
-    // Validate payment details if they are being updated
+    // Validate phone number if being updated
+    if (updateDto.phoneNumber) {
+      this.validatePhoneNumber(updateDto.phoneNumber);
+    }
+    
+    // Validate payment details if being updated
     if (updateDto.paymentMethod || updateDto.paymentPhoneNumber) {
       const paymentMethod = updateDto.paymentMethod || personalDetail.paymentMethod;
       const paymentPhoneNumber = updateDto.paymentPhoneNumber || personalDetail.paymentPhoneNumber;
