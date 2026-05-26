@@ -1,47 +1,25 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UserModule } from '../user/user.module';
-import { JwtModule } from '@nestjs/jwt';
-import { APP_GUARD } from '@nestjs/core';
-import { RolesGuard } from './roles.guard';
-import { AuthGuard } from './auth.guard';
+import { EmailModule } from '../email/email.module';
 
 @Module({
   imports: [
-    ConfigModule,
     UserModule,
+    EmailModule,
     JwtModule.registerAsync({
-      global: true,
-      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET', 'your-secret-key'),
+        signOptions: { expiresIn: '7d' },
+      }),
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => {
-        const jwtExpiresIn = configService.get<string>('JWT_EXPIRES_IN', '1h');
-        const expiresInAsNumber = Number(jwtExpiresIn);
-
-        return {
-          secret: configService.get<string>('JWT_SECRET', 'change-this-secret'),
-          signOptions: {
-            expiresIn: Number.isNaN(expiresInAsNumber)
-              ? (jwtExpiresIn as unknown as number)
-              : expiresInAsNumber,
-          },
-        };
-      },
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
-  ],
+  providers: [AuthService],
+  exports: [AuthService],
 })
 export class AuthModule {}

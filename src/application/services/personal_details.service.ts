@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { PersonalDetails, MaritalStatus, Gender, Disability } from '../entities/personal_details.entity';
 import { CreatePersonalDetailDto, UpdatePersonalDetailDto, UpdatePaymentDetailsDto } from '../dto/create_personal_details.dto';
 import { AdminService } from 'src/admin/admin.service';
+
 @Injectable()
 export class PersonalDetailService {
   constructor(
@@ -13,7 +14,75 @@ export class PersonalDetailService {
     private readonly adminService: AdminService
   ) {}
 
+  // Validate main phone number (required field)
+  private validatePhoneNumber(phoneNumber: string): void {
+    if (!phoneNumber) {
+      throw new BadRequestException('Phone number is required');
+    }
+    
+    const cleanedNumber = phoneNumber.replace(/\D/g, '');
+    const last10Digits = cleanedNumber.slice(-10);
+    const phoneRegex = /^0[89][0-9]{8}$/;
+    
+    if (!phoneRegex.test(last10Digits)) {
+      throw new BadRequestException(
+        'Phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)'
+      );
+    }
+  }
+
+  // Validate payment phone number (conditional based on payment method)
+  private validatePaymentPhone(paymentMethod: string, phoneNumber: string): void {
+    if (!phoneNumber) return;
+    
+    const cleanedNumber = phoneNumber.replace(/\D/g, '');
+    const last10Digits = cleanedNumber.slice(-10);
+    
+    if (paymentMethod === 'tnm' || paymentMethod === 'tnm_mpamba') {
+      if (!last10Digits.startsWith('08')) {
+        throw new BadRequestException(
+          'TNM Mpamba number must start with 08. Examples: 0888123456 or +265888123456'
+        );
+      }
+      if (last10Digits.length !== 10) {
+        throw new BadRequestException(
+          'TNM Mpamba number must be exactly 10 digits long'
+        );
+      }
+    }
+    
+    if (paymentMethod === 'airtel' || paymentMethod === 'airtel_money') {
+      if (!last10Digits.startsWith('09')) {
+        throw new BadRequestException(
+          'Airtel Money number must start with 09. Examples: 0999123456 or +265999123456'
+        );
+      }
+      if (last10Digits.length !== 10) {
+        throw new BadRequestException(
+          'Airtel Money number must be exactly 10 digits long'
+        );
+      }
+    }
+  }
+
+  // Helper method to validate payment details
+  private validatePaymentDetails(paymentMethod?: string, paymentPhoneNumber?: string): void {
+    if (paymentMethod && paymentPhoneNumber) {
+      this.validatePaymentPhone(paymentMethod, paymentPhoneNumber);
+    }
+    
+    if (!paymentMethod && paymentPhoneNumber) {
+      throw new BadRequestException(
+        'Payment method is required when providing payment phone number'
+      );
+    }
+  }
+
   async create(userId: string, createDto: CreatePersonalDetailDto): Promise<PersonalDetails> {
+    // Validate all phone numbers before creating
+    this.validatePhoneNumber(createDto.phoneNumber);
+    this.validatePaymentDetails(createDto.paymentMethod, createDto.paymentPhoneNumber);
+
     const existingDetails = await this.personalDetailRepository.findOne({
       where: { userId }
     });
@@ -43,12 +112,18 @@ export class PersonalDetailService {
       ...createDto,
     });
 
-    const saved= await this.personalDetailRepository.save(personalDetail);
+    const saved = await this.personalDetailRepository.save(personalDetail);
     await this.adminService.syncProfile(saved);
     return saved;
   }
 
   async upsertByUserId(userId: string, data: CreatePersonalDetailDto): Promise<PersonalDetails> {
+    // Validate phone numbers before upsert
+    if (data.phoneNumber) {
+      this.validatePhoneNumber(data.phoneNumber);
+    }
+    this.validatePaymentDetails(data.paymentMethod, data.paymentPhoneNumber);
+
     const existingDetails = await this.personalDetailRepository.findOne({
       where: { userId },
     });
@@ -92,6 +167,18 @@ export class PersonalDetailService {
 
   async update(id: string, updateDto: UpdatePersonalDetailDto): Promise<PersonalDetails> {
     const personalDetail = await this.findOne(id);
+    
+    // Validate phone number if being updated
+    if (updateDto.phoneNumber) {
+      this.validatePhoneNumber(updateDto.phoneNumber);
+    }
+    
+    // Validate payment details if being updated
+    if (updateDto.paymentMethod || updateDto.paymentPhoneNumber) {
+      const paymentMethod = updateDto.paymentMethod || personalDetail.paymentMethod;
+      const paymentPhoneNumber = updateDto.paymentPhoneNumber || personalDetail.paymentPhoneNumber;
+      this.validatePaymentDetails(paymentMethod, paymentPhoneNumber);
+    }
     
     if (updateDto.nationalIdNumber && updateDto.nationalIdNumber !== personalDetail.nationalIdNumber) {
       const existing = await this.personalDetailRepository.findOne({
@@ -148,6 +235,11 @@ export class PersonalDetailService {
 
   async updatePaymentDetails(userId: string, paymentDto: UpdatePaymentDetailsDto): Promise<PersonalDetails> {
     const personalDetail = await this.findByUserId(userId);
+    
+    // Validate payment details before updating
+    const paymentMethod = (paymentDto as any).paymentMethod || personalDetail.paymentMethod;
+    const paymentPhoneNumber = (paymentDto as any).paymentPhoneNumber || personalDetail.paymentPhoneNumber;
+    this.validatePaymentDetails(paymentMethod, paymentPhoneNumber);
     
     if (paymentDto.paymentBranch !== undefined) personalDetail.paymentBranch = paymentDto.paymentBranch;
     if ((paymentDto as any).paymentMethod !== undefined) personalDetail.paymentMethod = (paymentDto as any).paymentMethod;

@@ -1,4 +1,3 @@
-// src/notification/controller/studentNotification.controller.ts
 import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Patch } from '@nestjs/common';
 import { StudentNotificationService } from '../service/studentNotification.service';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -48,7 +47,7 @@ export class StudentNotificationController {
     };
   }
 
-  // Mark a single notification as read
+  // mark single notification as it has been red
   @Patch(':notificationId/read')
   async markAsRead(@Param('notificationId') notificationId: string, @Req() req) {
     const userId = req.user.id;
@@ -61,7 +60,7 @@ export class StudentNotificationController {
     };
   }
 
-  // Mark all notifications as read
+  // Mark all notifications as have been red
   @Post('mark-all-read')
   async markAllAsRead(@Req() req) {
     const userId = req.user.id;
