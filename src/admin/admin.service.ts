@@ -16,21 +16,6 @@ import { RankingService } from 'src/ranking/ranking.service';
 
 @Injectable()
 export class AdminService {
-<<<<<<< HEAD
-constructor(
-  @InjectRepository(ProfileData)
-  private readonly profileRepo: Repository<ProfileData>,
-  @InjectRepository(AcademicDetails)
-  private readonly academicRepo: Repository<AcademicDetails>,
-  @InjectRepository(VerificationLog)
-  private readonly verificationLogRepo: Repository<VerificationLog>,
-  @Inject(forwardRef(() => ReviewService))
-  private readonly reviewRepo: ReviewService,
-  private readonly notificationService: StudentNotificationService,
-  private readonly userService: UserService,
-  private readonly rankingService: RankingService,
-){}
-=======
   constructor(
     @InjectRepository(ProfileData)
     private readonly profileRepo: Repository<ProfileData>,
@@ -45,8 +30,8 @@ constructor(
     @InjectRepository(ApplicationSubmission)
     private submissionRepository?: Repository<ApplicationSubmission>,
     private readonly submissionService?: ApplicationSubmissionService,
+    private readonly rankingService?: RankingService,
   ) {}
->>>>>>> 3760adcb59a52c3d8f6c3c811c6edf4778dfdac1
 
   private normalizeProfileStatus(status?: string | null): string {
     switch ((status ?? '').trim().toLowerCase()) {
@@ -95,21 +80,11 @@ constructor(
     let profile = await this.profileRepo.findOne({
       where: { userId }
     });
-
-<<<<<<< HEAD
-async getDashboardStats() {
-  await this.rankingService.refreshAllRankings().catch(() => null);
-
-  const profiles = await this.profileRepo.find({
-    order: { status: 'ASC', score: 'DESC', firstName: 'ASC', lastName: 'ASC' },
-  });
-=======
     if (!profile) {
       profile = this.profileRepo.create({
         userId
       });
     }
->>>>>>> 3760adcb59a52c3d8f6c3c811c6edf4778dfdac1
 
     profile.firstName = personal.firstName;
     profile.lastName = personal.lastName;
@@ -182,19 +157,10 @@ async getDashboardStats() {
     };
   }
 
-<<<<<<< HEAD
-async getApplicationsByStatus(status: 'approved' | 'flagged') {
-  await this.rankingService.refreshAllRankings().catch(() => null);
-
-  const profiles = await this.profileRepo.find({
-    order: { score: 'DESC', firstName: 'ASC', lastName: 'ASC' },
-  });
-=======
   async getApplicationsByStatus(status: 'approved' | 'flagged') {
     const profiles = await this.profileRepo.find({
       order: { firstName: 'ASC', lastName: 'ASC' },
     });
->>>>>>> 3760adcb59a52c3d8f6c3c811c6edf4778dfdac1
 
     const filteredProfiles = profiles.filter(
       (profile) => this.normalizeProfileStatus(profile.status) === status,
@@ -252,6 +218,10 @@ async getApplicationsByStatus(status: 'approved' | 'flagged') {
       throw new NotFoundException('Applicant not found');
     }
 
+    const academic = await this.academicRepo.findOne({
+      where: { userId },
+    });
+
     return {
       applicant: {
         userId: user.id,
@@ -266,130 +236,9 @@ async getApplicationsByStatus(status: 'approved' | 'flagged') {
         scoreFlagReason: profile.scoreFlagReason ?? null,
         status: this.normalizeProfileStatus(profile.status),
         reviewComments: profile.reviewComments ?? null,
-<<<<<<< HEAD
         program: academic?.programOfStudy ?? 'Programme not yet submitted',
         department: academic?.department ?? null,
         yearOfStudy: academic?.yearOfStudy ?? null,
-      };
-    }),
-  );
-
-  return {
-    status,
-    count: applicants.length,
-    applicants,
-  };
-}
-
-async getUserApplication(userId: string) {
-  await this.rankingService.refreshAllRankings().catch(() => null);
-
-  const [profile, application, verificationLogs, user] = await Promise.all([
-    this.getOrCreateProfile(userId),
-    this.reviewRepo.getCompleteApplication(userId),
-    this.verificationLogRepo.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-    }),
-    this.userService.findById(userId),
-  ]);
-
-  if (!user) {
-    throw new NotFoundException('Applicant not found');
-  }
-
-  return {
-    applicant: {
-      userId: user.id,
-      email: user.email,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      registrationNumber: profile.registrationNumber,
-      score: profile.score ?? 0,
-      rank: profile.rank ?? null,
-      overallPercentage: profile.overallPercentage ?? 0,
-      scoreFlagged: profile.scoreFlagged ?? false,
-      scoreFlagReason: profile.scoreFlagReason ?? null,
-      status: this.normalizeProfileStatus(profile.status),
-      reviewComments: profile.reviewComments ?? null,
-    },
-    application: application.data,
-    applicationMeta: application.metadata,
-    verificationLogs,
-  };
-}
-
-async getAdminNotifications(adminId: string) {
-  const result = await this.notificationService.getUserNotifications(adminId, {
-    limit: 50,
-    offset: 0,
-  });
-
-  return result.notifications;
-}
-
-async markAdminNotificationRead(notificationId: string, adminId: string) {
-  return this.notificationService.markAsRead(notificationId, adminId);
-}
-
-async markAllAdminNotificationsRead(adminId: string) {
-  return this.notificationService.markAllAsRead(adminId);
-}
-
-async clearAdminNotifications(adminId: string) {
-  return this.notificationService.deleteAllNotifications(adminId);
-}
-
-async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId: string) {
-  const normalizedStatus = this.normalizeProfileStatus(createAdminDto.status);
-  if (
-    normalizedStatus !== AdminApplicationReviewStatus.APPROVED &&
-    normalizedStatus !== AdminApplicationReviewStatus.FLAGGED
-  ) {
-    throw new BadRequestException('Unsupported review status');
-  }
-
-  const [profile, user] = await Promise.all([
-    this.getOrCreateProfile(userId),
-    this.userService.findById(userId),
-  ]);
-
-  if (!user) {
-    throw new NotFoundException('Applicant not found');
-  }
-
-  const reviewComment = createAdminDto.reviewComments?.trim() || null;
-  if (normalizedStatus === AdminApplicationReviewStatus.FLAGGED && !reviewComment) {
-    throw new BadRequestException('A review comment is required when flagging an application');
-  }
-
-  profile.status = normalizedStatus;
-  profile.reviewComments = reviewComment ?? '';
-
-  await this.profileRepo.save(profile);
-
-  if (normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
-    await this.notificationService.createNotification({
-      userId,
-      userRole: UserRole.STUDENT,
-      title: 'Application Approved',
-      message: reviewComment
-        ? `Your application has been approved. Reviewer comment: ${reviewComment}`
-        : 'Your application has been approved.',
-      type: NotificationType.APPLICATION_APPROVED,
-      priority: NotificationPriority.HIGH,
-      metadata: { userId, adminId, status: normalizedStatus },
-    });
-  } else {
-    await this.notificationService.createNotification({
-      userId,
-      userRole: UserRole.STUDENT,
-      title: 'Application Requires Attention',
-      message: `Your application has been flagged for review. Comment: ${reviewComment}`,
-      type: NotificationType.APPLICATION_REJECTED,
-      priority: NotificationPriority.HIGH,
-      metadata: { userId, adminId, status: normalizedStatus },
-=======
       },
       application: application.data,
       applicationMeta: application.metadata,
@@ -401,7 +250,6 @@ async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId:
     const result = await this.notificationService.getUserNotifications(adminId, {
       limit: 50,
       offset: 0,
->>>>>>> 3760adcb59a52c3d8f6c3c811c6edf4778dfdac1
     });
 
     return result.notifications;
@@ -419,7 +267,6 @@ async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId:
     return this.notificationService.deleteAllNotifications(adminId);
   }
 
-  // REVIEW APPLICATION (Using CreateAdminDto)
   async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId: string) {
     const normalizedStatus = this.normalizeProfileStatus(createAdminDto.status);
     if (
@@ -448,10 +295,8 @@ async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId:
 
     await this.profileRepo.save(profile);
 
-    // ✅ FIX: Convert null to undefined for comments
     const commentForUpdate = reviewComment === null ? undefined : reviewComment;
 
-    // Also update application submission status if available
     if (this.submissionService && normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
       try {
         await this.submissionService.updateStatus(userId, ApplicationStatus.APPROVED, commentForUpdate, adminId);
