@@ -9,13 +9,14 @@ import { ProfileData } from 'src/application/entities/profile_data';
 import { ReviewService } from 'src/application/services/reviewService';
 import { AcademicDetails } from 'src/application/entities/academic_details.entity';
 import { UserService } from 'src/user/user.service';
+import { RankingService } from 'src/ranking/ranking.service';
 
 @Injectable()
 export class SponsorService {
   constructor(
     @InjectRepository(Sponsor)
     private readonly sponsorRepo: Repository<Sponsor>,
-    @InjectRepository(SponsorAllocation)
+    @InjectRepository(SponsorAllocation)   
     private readonly allocationRepo: Repository<SponsorAllocation>,
     @InjectRepository(ProfileData)
     private readonly profileRepo: Repository<ProfileData>,
@@ -24,11 +25,14 @@ export class SponsorService {
     private readonly fileService: FileService,
     private readonly reviewService: ReviewService,
     private readonly userService: UserService,
+    private readonly rankingService: RankingService,
   ) {}
 
   private async buildApprovedApplicantPool(excludedUserIds: string[] = []) {
+    await this.rankingService.refreshAllRankings().catch(() => null);
+
     const allProfiles = await this.profileRepo.find({
-      order: { firstName: 'ASC', lastName: 'ASC' },
+      order: { score: 'DESC', firstName: 'ASC', lastName: 'ASC' },
     });
 
     const profiles = allProfiles.filter((profile) => {
@@ -61,13 +65,17 @@ export class SponsorService {
           program: academic?.programOfStudy ?? 'Programme not yet submitted',
           department: academic?.department ?? null,
           yearOfStudy: academic?.yearOfStudy ?? null,
-          score: Math.round(readiness.completionPercentage),
+          score: profile.score ?? Math.round(readiness.completionPercentage),
+          rank: profile.rank ?? null,
         };
       }),
     );
 
     return applicants.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      if ((a.rank ?? Number.MAX_SAFE_INTEGER) !== (b.rank ?? Number.MAX_SAFE_INTEGER)) {
+        return (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER);
+      }
       return a.name.localeCompare(b.name);
     });
   }

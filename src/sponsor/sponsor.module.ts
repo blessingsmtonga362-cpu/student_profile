@@ -9,6 +9,7 @@ import { AcademicDetails } from 'src/application/entities/academic_details.entit
 import { FileModule } from 'src/file/file.module';
 import { ReviewModule } from 'src/application/modules/review.module';
 import { UserModule } from 'src/user/user.module';
+import { RankingModule } from 'src/ranking/ranking.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UserModule } from 'src/user/user.module';
     FileModule,
     forwardRef(() => ReviewModule),
     UserModule,
+    RankingModule,
   ],
   controllers: [SponsorController],
   providers: [SponsorService],

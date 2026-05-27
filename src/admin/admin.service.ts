@@ -10,6 +10,7 @@ import { AdminApplicationReviewStatus, CreateAdminDto } from './dto/create-admin
 import { StudentNotificationService } from 'src/notification/service/studentNotification.service';
 import { NotificationPriority, NotificationType, UserRole } from 'src/notification/entity/studentNotification.entity';
 import { UserService } from 'src/user/user.service';
+import { RankingService } from 'src/ranking/ranking.service';
 
 @Injectable()
 export class AdminService {
@@ -24,6 +25,7 @@ constructor(
   private readonly reviewRepo: ReviewService,
   private readonly notificationService: StudentNotificationService,
   private readonly userService: UserService,
+  private readonly rankingService: RankingService,
 ){}
 
 private normalizeProfileStatus(status?: string | null): string {
@@ -94,8 +96,10 @@ async getProfiles(){
 }
 
 async getDashboardStats() {
+  await this.rankingService.refreshAllRankings().catch(() => null);
+
   const profiles = await this.profileRepo.find({
-    order: { status: 'ASC', firstName: 'ASC', lastName: 'ASC' },
+    order: { status: 'ASC', score: 'DESC', firstName: 'ASC', lastName: 'ASC' },
   });
 
   const approvedSupport = profiles.filter(
@@ -145,7 +149,8 @@ async getDashboardStats() {
           name: `${profile.firstName} ${profile.lastName}`.trim(),
           registrationNumber: profile.registrationNumber,
           program: academic?.programOfStudy ?? 'Programme not yet submitted',
-          score: completionByUserId.get(profile.userId) ?? 0,
+          score: profile.score ?? completionByUserId.get(profile.userId) ?? 0,
+          rank: profile.rank ?? null,
           status: this.normalizeProfileStatus(profile.status),
         };
       }),
@@ -153,8 +158,10 @@ async getDashboardStats() {
 }
 
 async getApplicationsByStatus(status: 'approved' | 'flagged') {
+  await this.rankingService.refreshAllRankings().catch(() => null);
+
   const profiles = await this.profileRepo.find({
-    order: { firstName: 'ASC', lastName: 'ASC' },
+    order: { score: 'DESC', firstName: 'ASC', lastName: 'ASC' },
   });
 
   const filteredProfiles = profiles.filter(
@@ -182,6 +189,11 @@ async getApplicationsByStatus(status: 'approved' | 'flagged') {
         lastName: profile.lastName,
         email: user?.email ?? '',
         registrationNumber: profile.registrationNumber,
+        score: profile.score ?? 0,
+        rank: profile.rank ?? null,
+        overallPercentage: profile.overallPercentage ?? 0,
+        scoreFlagged: profile.scoreFlagged ?? false,
+        scoreFlagReason: profile.scoreFlagReason ?? null,
         status: this.normalizeProfileStatus(profile.status),
         reviewComments: profile.reviewComments ?? null,
         program: academic?.programOfStudy ?? 'Programme not yet submitted',
@@ -199,6 +211,8 @@ async getApplicationsByStatus(status: 'approved' | 'flagged') {
 }
 
 async getUserApplication(userId: string) {
+  await this.rankingService.refreshAllRankings().catch(() => null);
+
   const [profile, application, verificationLogs, user] = await Promise.all([
     this.getOrCreateProfile(userId),
     this.reviewRepo.getCompleteApplication(userId),
@@ -220,6 +234,11 @@ async getUserApplication(userId: string) {
       firstName: profile.firstName,
       lastName: profile.lastName,
       registrationNumber: profile.registrationNumber,
+      score: profile.score ?? 0,
+      rank: profile.rank ?? null,
+      overallPercentage: profile.overallPercentage ?? 0,
+      scoreFlagged: profile.scoreFlagged ?? false,
+      scoreFlagReason: profile.scoreFlagReason ?? null,
       status: this.normalizeProfileStatus(profile.status),
       reviewComments: profile.reviewComments ?? null,
     },

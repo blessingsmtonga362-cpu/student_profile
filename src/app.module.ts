@@ -11,6 +11,7 @@ import { AdminModule } from './admin/admin.module';
 import { UserService } from './user/user.service';
 import { NotificationModule } from './notification/module/notification.module';
 import { SponsorModule } from './sponsor/sponsor.module';
+import { RankingModule } from './ranking/ranking.module';
 
 const envFilePath = join(process.cwd(), '.env');
 
@@ -78,6 +79,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     AdminModule,
     NotificationModule,
     SponsorModule,
+    RankingModule,
   ],
 })
 export class AppModule implements OnModuleInit {

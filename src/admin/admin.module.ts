@@ -8,6 +8,7 @@ import { AcademicDetails } from 'src/application/entities/academic_details.entit
 import { VerificationLog } from 'src/application/entities/verification-log.entity';
 import { NotificationModule } from 'src/notification/module/notification.module';
 import { UserModule } from 'src/user/user.module';
+import { RankingModule } from 'src/ranking/ranking.module';
 
 @Module({
   controllers: [AdminController],
@@ -17,6 +18,7 @@ import { UserModule } from 'src/user/user.module';
     forwardRef(() => ReviewModule),
     NotificationModule,
     UserModule,
+    RankingModule,
   ],
   exports: [AdminService]
 })
