@@ -1,38 +1,41 @@
-
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ReviewModule } from './modules/review.module';
 import { PersonalDetails } from './entities/personal_details.entity';
 import { AcademicDetails } from './entities/academic_details.entity';
 import { Family } from './entities/family.entity';
 import { Education } from './entities/education.entity';
-import { PersonalDetailService } from './services/personal_details.service';
-import { AcademicDetailService } from './services/academic_details.service';
-import { FamilyService } from './services/family.service';
-import { EducationService } from './services/education.service';
+import { ApplicationSubmission } from './entities/application_submission.entity';
 import { PersonalDetailController } from './controllers/personal_details.controller';
 import { AcademicDetailController } from './controllers/academic_details.controller';
 import { FamilyController } from './controllers/family.controller';
 import { EducationController } from './controllers/education.controller';
 import { DocumentUploadController } from './controllers/document-upload.controller';
-import { FileModule } from '../file/file.module';
-import { ReviewController } from './controllers/review.controller';
-import { ReviewService } from './services/reviewService';
+import { PersonalDetailService } from './services/personal_details.service';
+import { AcademicDetailService } from './services/academic_details.service';
+import { FamilyService } from './services/family.service';
+import { EducationService } from './services/education.service';
 import { DocumentUploadService } from './services/document-upload.service';
-//import { StudentNotificationController} from 'src/notification/controller/studentNotification.controller';
-//import { NotificationModule } from 'src/notification/module/studentNotification.module';
+import { FileModule } from '../file/file.module';
 import { UserModule } from 'src/user/user.module';
 import { AuthModule } from 'src/auth/auth.module';
 import { AdminModule } from 'src/admin/admin.module';
 
-
 @Module({
   imports: [
-    TypeOrmModule.forFeature([PersonalDetails, AcademicDetails, Family, Education]),
+    TypeOrmModule.forFeature([
+      PersonalDetails, 
+      AcademicDetails, 
+      Family, 
+      Education, 
+      ApplicationSubmission
+    ]),
     FileModule,
-    //NotificationModule,
     UserModule,
     AuthModule,
+    ReviewModule,
     AdminModule,
+
   ],
   controllers: [
     PersonalDetailController, 
@@ -40,27 +43,20 @@ import { AdminModule } from 'src/admin/admin.module';
     FamilyController,
     EducationController,
     DocumentUploadController,
-    ReviewController,
-    //StudentNotificationController,
   ],
   providers: [
     PersonalDetailService, 
     AcademicDetailService, 
     FamilyService,
     EducationService,
-    ReviewService,
     DocumentUploadService,
-    //StudentNotificationController,
-
+  
   ],
   exports: [
     PersonalDetailService, 
     AcademicDetailService, 
     FamilyService,
     EducationService,
-    ReviewService,
-    DocumentUploadService,
-    //StudentNotificationController,
   ],
 })
 export class ApplicationModule {}

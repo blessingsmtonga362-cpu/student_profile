@@ -6,16 +6,68 @@ import {
   IsDateString,
   IsUrl,
   IsInt,
-  Min
+  Min,
+  Length,
+  Matches,
+  registerDecorator,
+  ValidationOptions,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+  ValidationArguments
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { EducationLevel } from '../entities/family.entity';
 
+// Custom validator for sibling numbers
+@ValidatorConstraint({ async: false })
+export class SiblingNumbersConstraint implements ValidatorConstraintInterface {
+  validate(value: any, args: ValidationArguments) {
+    const object = args.object as any;
+    const numberStillInSchool = object.numberStillInSchool;
+    const siblingsInPrimary = object.siblingsInPrimary || 0;
+    const siblingsInSecondary = object.siblingsInSecondary || 0;
+    const siblingsInTertiary = object.siblingsInTertiary || 0;
+    
+    // Skip validation if any of the required fields are missing
+    if (numberStillInSchool === undefined || 
+        object.siblingsInPrimary === undefined || 
+        object.siblingsInSecondary === undefined || 
+        object.siblingsInTertiary === undefined) {
+      return true;
+    }
+    
+    const calculatedTotal = siblingsInPrimary + siblingsInSecondary + siblingsInTertiary;
+    return numberStillInSchool === calculatedTotal;
+  }
+
+  defaultMessage(args: ValidationArguments) {
+    const object = args.object as any;
+    const calculatedTotal = (object.siblingsInPrimary || 0) + 
+                           (object.siblingsInSecondary || 0) + 
+                           (object.siblingsInTertiary || 0);
+    return `Number of siblings still in school (${object.numberStillInSchool}) must equal the sum of siblings in primary, secondary, and tertiary (${calculatedTotal})`;
+  }
+}
+
+export function ValidateSiblingNumbers(validationOptions?: ValidationOptions) {
+  return function (object: Object, propertyName: string) {
+    registerDecorator({
+      target: object.constructor,
+      propertyName: propertyName,
+      options: validationOptions,
+      constraints: [],
+      validator: SiblingNumbersConstraint,
+    });
+  };
+}
+
 export class CreateFamilyDto {
+  // Parental Status
   @IsOptional()
   @IsString()
   parentalStatus?: string;
 
+  // Father's Information
   @IsOptional()
   @IsString()
   fatherFirstName?: string;
@@ -30,10 +82,14 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Father\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Father\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   fatherPhone?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   fatherProfession?: string;
 
   @IsOptional()
@@ -53,6 +109,7 @@ export class CreateFamilyDto {
   @IsString()
   fatherPostalAddress?: string;
 
+  // Mother's Information
   @IsOptional()
   @IsString()
   motherFirstName?: string;
@@ -67,6 +124,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Mother\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Mother\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   motherPhone?: string;
 
   @IsOptional()
@@ -90,6 +151,7 @@ export class CreateFamilyDto {
   @IsString()
   motherPostalAddress?: string;
 
+  // Single Parent Information
   @IsOptional()
   @IsString()
   parentFirstName?: string;
@@ -104,6 +166,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Parent\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Parent\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   parentPhone?: string;
 
   @IsOptional()
@@ -131,13 +197,14 @@ export class CreateFamilyDto {
   @IsString()
   deceasedParentId?: string;
 
+  // Guardian Information
   @IsOptional()
   @IsString()
   guardianFirstName?: string;
 
   @IsOptional()
   @IsString()
-  guardianLastName?: string;
+  guardianSurname?: string;
 
   @IsOptional()
   @IsString()
@@ -145,6 +212,10 @@ export class CreateFamilyDto {
 
   @IsOptional()
   @IsString()
+  @Length(10, 10, { message: 'Guardian\'s phone number must be exactly 10 digits' })
+  @Matches(/^0[89][0-9]{8}$/, { 
+    message: 'Guardian\'s phone number must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)' 
+  })
   guardianPhone?: string;
 
   @IsOptional()
@@ -176,6 +247,7 @@ export class CreateFamilyDto {
   @IsString()
   deceasedMotherId?: string;
 
+  // Siblings Information with Validation
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -184,6 +256,7 @@ export class CreateFamilyDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @ValidateSiblingNumbers()
   numberStillInSchool?: number;
 
   @IsOptional()
@@ -201,6 +274,7 @@ export class CreateFamilyDto {
   @Min(0)
   siblingsInTertiary?: number;
 
+  // Guardian Personal Details
   @IsDateString()
   @IsOptional()
   dateOfBirth?: Date;
@@ -211,7 +285,7 @@ export class CreateFamilyDto {
 
   @IsString()
   @IsOptional()
-  traditionalAuthority!: string;
+  traditionalAuthority?: string;
 
   @IsString()
   @IsOptional()
@@ -225,6 +299,11 @@ export class CreateFamilyDto {
   @IsOptional()
   levelOfEducation?: EducationLevel;
 
+  @IsOptional()
+  @IsString()
+  profession?: string;
+
+  // Document URLs
   @IsUrl()
   @IsOptional()
   deathCertificateUrl?: string;
@@ -236,21 +315,17 @@ export class CreateFamilyDto {
   @IsUrl()
   @IsOptional()
   consentFormUrl?: string;
-
-  @IsOptional()
-  @IsString()
-  profession?: string;
 }
 
 export class UpdateFamilyDto extends PartialType(CreateFamilyDto) {}
 
 export class UploadFamilyDocumentsDto {
   @IsOptional()
-  deathCertificate?: any; // For file upload
+  deathCertificate?: any;
 
   @IsOptional()
-  nationalId?: any; // For file upload
+  nationalId?: any;
 
   @IsOptional()
-  consentForm?: any; // For file upload
+  consentForm?: any;
 }

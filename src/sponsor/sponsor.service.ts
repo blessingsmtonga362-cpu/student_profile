@@ -6,7 +6,7 @@ import { SponsorAllocation } from './entities/sponsor-allocation.entity';
 import { CreateSponsorDto } from './dto/create-sponsor.dto';
 import { FileService } from 'src/file/file.service';
 import { ProfileData } from 'src/application/entities/profile_data';
-import { ReviewService } from 'src/application/services/reviewService';
+import { ReviewService } from 'src/application/services/review.service';
 import { AcademicDetails } from 'src/application/entities/academic_details.entity';
 import { UserService } from 'src/user/user.service';
 import { RankingService } from 'src/ranking/ranking.service';

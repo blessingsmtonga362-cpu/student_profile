@@ -1,4 +1,3 @@
-// src/application/controllers/review.controller.ts
 import { 
   Controller, 
   Get, 
@@ -24,6 +23,8 @@ import { UpdateEducationDto } from '../dto/education/update-education.dto';
 import { UserService } from '../../user/user.service'; 
 import { Education, EducationLevel, FeePayer } from '../entities/education.entity';
 import { Disability, Gender, MaritalStatus } from '../entities/personal_details.entity';
+import { ApplicationSubmissionService } from '../services/application_submission.service';
+import { ApplicationStatus } from '../entities/application_submission.entity';
 
 @Controller('review')
 @UseGuards(AuthGuard)
@@ -34,6 +35,7 @@ export class ReviewController {
     private readonly familyService: FamilyService,
     private readonly educationService: EducationService,
     private readonly userService: UserService,
+    private readonly submissionService: ApplicationSubmissionService,
   ) {}
   
   private async getUserIdFromRequest(req: any): Promise<string> {
@@ -282,7 +284,7 @@ export class ReviewController {
     };
   }
 
-  // ========== PERSONAL DETAILS REVIEW ==========
+  // PERSONAL DETAILS REVIEW 
   @Get('personal-details')
   async getPersonalDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -310,7 +312,7 @@ export class ReviewController {
     };
   }
 
-  // ========== ACADEMIC DETAILS REVIEW ==========
+  //ACADEMIC DETAILS REVIEW
   @Get('academic-details')
   async getAcademicDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -354,7 +356,7 @@ export class ReviewController {
     };
   }
 
-  // ========== FAMILY DETAILS REVIEW ==========
+  //Kuonga maditelu a abanja lakwanu
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -382,7 +384,7 @@ export class ReviewController {
     };
   }
 
-  // ========== EDUCATION REVIEW ==========
+  //kuona maditelu a sukulu
   @Get('education/:level')
   async getEducationByLevel(@Req() req, @Param('level') level: string) {
     const userId = await this.getUserIdFromRequest(req);
@@ -426,76 +428,104 @@ export class ReviewController {
     };
   }
 
-  // ========== SUBMIT FULL APPLICATION ==========
-@Post('submit-application')
-async submitFullApplication(@Req() req, @Body() applicationData: any) {
-  const userId = await this.getUserIdFromRequest(req);
-
-  try {
-    this.validateAcademicSection(applicationData.academics);
-    this.validateEducationSection('Primary', applicationData.education?.primary);
-    this.validateEducationSection('Secondary', applicationData.education?.secondary);
-    this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
-
-    if (applicationData.personal) {
-      const personalData = this.normalizePersonalPayload(applicationData);
-      await this.personalDetailService.upsertByUserId(userId, personalData as any);
-    }
+  // kuona stage ya form unapannga apply
+  @Get('submission-status')
+  async getSubmissionStatus(@Req() req) {
+    const userId = await this.getUserIdFromRequest(req);
+    const canSubmit = await this.submissionService.canUserSubmit(userId);
+    const submission = await this.submissionService.getUserSubmission(userId);
     
-    if (applicationData.family) {
-      const familyData = this.normalizeFamilyPayload(applicationData.family);
-      await this.familyService.upsertByUserId(userId, familyData as any);
-    }
-    
-    const academicData = {
-      programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
-      department: this.toOptionalString(applicationData.academics.department) ?? '',
-      yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
-    };
-    await this.academicDetailService.upsertByUserId(userId, academicData as any);
-    
-    if (applicationData.education?.primary?.schoolName) {
-      await this.educationService.upsertByLevel(
-        userId,
-        EducationLevel.PRIMARY,
-        this.normalizeEducationPayload(applicationData.education.primary),
-      );
-    }
-
-    if (applicationData.education?.secondary?.schoolName) {
-      await this.educationService.upsertByLevel(
-        userId,
-        EducationLevel.SECONDARY,
-        this.normalizeEducationPayload(applicationData.education.secondary),
-      );
-    }
-
-    if (applicationData.education?.tertiary?.schoolName) {
-      await this.educationService.upsertByLevel(
-        userId,
-        EducationLevel.TERTIARY,
-        {
-          ...this.normalizeEducationPayload(applicationData.education.tertiary),
-          isSemesterBased: true,
-        },
-      );
-    }
-
     return {
       success: true,
-      message: 'Application submitted successfully!',
-      submittedAt: new Date(),
-      applicationStatus: 'pending_review',
+      canSubmit: canSubmit.canSubmit,
+      message: canSubmit.message,
+      submission: submission ? {
+        status: submission.status,
+        submittedAt: submission.submittedAt,
+        applicationReference: submission.applicationReference,
+        canResubmit: submission.canResubmit,
+        resubmitDeadline: submission.resubmitDeadline,
+      } : null,
     };
-  } catch (error: any) {
-    throw new BadRequestException({
-      message: error?.message ?? 'Failed to submit application',
-      error: error.message,
-    });
   }
-}
 
-  // ========== SUBMIT FOR FINAL REVIEW ==========
+  //kupanga subumiti form yonse ukamailza kupanga filu ma fiwudi onse a form
+  @Post('submit-application')
+  async submitFullApplication(@Req() req, @Body() applicationData: any) {
+    const userId = await this.getUserIdFromRequest(req);
+
+    try {
+      // VALIDATES all sections are complete before allowing final submission
+      this.validateAcademicSection(applicationData.academics);
+      this.validateEducationSection('Primary', applicationData.education?.primary);
+      this.validateEducationSection('Secondary', applicationData.education?.secondary);
+      this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
+
+      // SAVES any pending data (if not already saved)
+      if (applicationData.personal) {
+        const personalData = this.normalizePersonalPayload(applicationData);
+        await this.personalDetailService.upsertByUserId(userId, personalData as any);
+      }
+      
+      if (applicationData.family) {
+        const familyData = this.normalizeFamilyPayload(applicationData.family);
+        await this.familyService.upsertByUserId(userId, familyData as any);
+      }
+      
+      const academicData = {
+        programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
+        department: this.toOptionalString(applicationData.academics.department) ?? '',
+        yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
+      };
+      await this.academicDetailService.upsertByUserId(userId, academicData as any);
+      
+      if (applicationData.education?.primary?.schoolName) {
+        await this.educationService.upsertByLevel(
+          userId,
+          EducationLevel.PRIMARY,
+          this.normalizeEducationPayload(applicationData.education.primary),
+        );
+      }
+
+      if (applicationData.education?.secondary?.schoolName) {
+        await this.educationService.upsertByLevel(
+          userId,
+          EducationLevel.SECONDARY,
+          this.normalizeEducationPayload(applicationData.education.secondary),
+        );
+      }
+
+      if (applicationData.education?.tertiary?.schoolName) {
+        await this.educationService.upsertByLevel(
+          userId,
+          EducationLevel.TERTIARY,
+          {
+            ...this.normalizeEducationPayload(applicationData.education.tertiary),
+            isSemesterBased: true,
+          },
+        );
+      }
+
+      // MARK SUBMISSION AS COMPLETE (NOTIFICATIONS ARE HANDLED INSIDE markAsSubmitted)
+      const applicationReference = `APP-${Date.now()}-${userId.slice(0, 8)}`;
+      const submission = await this.submissionService.markAsSubmitted(userId, applicationReference);
+
+      return {
+        success: true,
+        message: 'Application submitted successfully!',
+        applicationReference,
+        submittedAt: new Date(),
+        applicationStatus: 'pending_review',
+      };
+    } catch (error: any) {
+      throw new BadRequestException({
+        message: error?.message ?? 'Failed to submit application',
+        error: error.message,
+      });
+    }
+  }
+
+  // SUBMIT FOR FINAL REVIEW (Legacy - kept for compatibility) 
   @Post('submit')
   async submitApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -527,4 +557,5 @@ async submitFullApplication(@Req() req, @Body() applicationData: any) {
       applicationStatus: 'pending_review',
     };
   }
+  
 }

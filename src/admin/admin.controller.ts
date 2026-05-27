@@ -3,8 +3,11 @@ import { AdminService } from './admin.service';
 import { Role } from 'src/auth/role.enum';
 import { Roles } from 'src/auth/role.decorator';
 import { CreateAdminDto } from './dto/create-admin.dto';
+import { AuthGuard } from '../auth/auth.guard';
+import { UseGuards } from '@nestjs/common';
 
 @Controller('admin')
+@UseGuards(AuthGuard)
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

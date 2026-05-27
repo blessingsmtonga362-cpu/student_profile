@@ -20,9 +20,9 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
   
-  // Enable CORS for Next.js frontend - MORE PERMISSIVE FOR TESTING
+  
   app.enableCors({
-    origin: true, // Allow all origins temporarily for testing
+    origin: true, 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
@@ -31,6 +31,7 @@ async function bootstrap() {
   
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);
+
   console.log(`NestJS backend running on http://localhost:${port}`);
 }
 bootstrap();

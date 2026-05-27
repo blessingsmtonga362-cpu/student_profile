@@ -10,6 +10,7 @@ import { ReviewModule } from './application/modules/review.module';
 import { AdminModule } from './admin/admin.module';
 import { UserService } from './user/user.service';
 import { NotificationModule } from './notification/module/notification.module';
+import { EmailModule } from './email/email.module';
 import { SponsorModule } from './sponsor/sponsor.module';
 import { RankingModule } from './ranking/ranking.module';
 
@@ -27,7 +28,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     'DB_PORT',
     'DB_USERNAME',
     'DB_PASSWORD',
-    'DB_NAME',
+    'DB_NAME',  // ✅ Changed from DB_NAME to DB_NAME (keep as is)
     'JWT_SECRET',
   ] as const;
 
@@ -52,7 +53,6 @@ function validateEnv(config: Record<string, string | undefined>) {
 
 @Module({
   imports: [
-
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath,
@@ -62,15 +62,15 @@ function validateEnv(config: Record<string, string | undefined>) {
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres' as const,
-        host: configService.getOrThrow<string>('DB_HOST'),
-        port: Number(configService.getOrThrow<string>('DB_PORT')),
-        username: configService.getOrThrow<string>('DB_USERNAME'),
-        password: configService.getOrThrow<string>('DB_PASSWORD'),
-        database: configService.getOrThrow<string>('DB_NAME'),
+        host: configService.get<string>('DB_HOST', 'localhost'),
+        port: Number(configService.get<string>('DB_PORT', '5432')),
+        username: configService.get<string>('DB_USERNAME', 'postgres'),
+        password: configService.get<string>('DB_PASSWORD', '2001'),
+        database: configService.get<string>('DB_NAME', 'student-db'), // 
         autoLoadEntities: true,
-        synchronize: configService.get<string>('DB_SYNCHRONIZE', 'false') === 'true',
+        synchronize: configService.get<string>('DB_SYNC', 'true') === 'true',
+        logging: configService.get<string>('DB_LOGGING', 'true') === 'true',
       }),
- 
     }),
     UserModule,
     AuthModule,
@@ -78,6 +78,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     ReviewModule,
     AdminModule,
     NotificationModule,
+    EmailModule,
     SponsorModule,
     RankingModule,
   ],
@@ -86,7 +87,6 @@ export class AppModule implements OnModuleInit {
   constructor(private userService: UserService) {}
 
   async onModuleInit() {
-    // apapa i was just trying to auto-seed admin user if it doesn't exist
     try {
       await this.userService.createAdmin();
     } catch (error) {
