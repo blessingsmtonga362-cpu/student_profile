@@ -24,7 +24,6 @@ import { UserService } from '../../user/user.service';
 import { Education, EducationLevel, FeePayer } from '../entities/education.entity';
 import { Disability, Gender, MaritalStatus } from '../entities/personal_details.entity';
 import { ApplicationSubmissionService } from '../services/application_submission.service';
-import { ApplicationStatus } from '../entities/application_submission.entity';
 
 @Controller('review')
 @UseGuards(AuthGuard)
@@ -284,7 +283,7 @@ export class ReviewController {
     };
   }
 
-  // PERSONAL DETAILS REVIEW 
+  // ========== PERSONAL DETAILS ==========
   @Get('personal-details')
   async getPersonalDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -312,7 +311,7 @@ export class ReviewController {
     };
   }
 
-  //ACADEMIC DETAILS REVIEW
+  // ========== ACADEMIC DETAILS ==========
   @Get('academic-details')
   async getAcademicDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -356,7 +355,7 @@ export class ReviewController {
     };
   }
 
-  //Kuonga maditelu a abanja lakwanu
+  // ========== FAMILY DETAILS ==========
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -384,7 +383,7 @@ export class ReviewController {
     };
   }
 
-  //kuona maditelu a sukulu
+  // ========== EDUCATION ==========
   @Get('education/:level')
   async getEducationByLevel(@Req() req, @Param('level') level: string) {
     const userId = await this.getUserIdFromRequest(req);
@@ -428,7 +427,7 @@ export class ReviewController {
     };
   }
 
-  // kuona stage ya form unapannga apply
+  // ========== SUBMISSION STATUS ==========
   @Get('submission-status')
   async getSubmissionStatus(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -449,29 +448,31 @@ export class ReviewController {
     };
   }
 
-  //kupanga subumiti form yonse ukamailza kupanga filu ma fiwudi onse a form
+  // ========== MAIN SUBMISSION ENDPOINT ==========
   @Post('submit-application')
   async submitFullApplication(@Req() req, @Body() applicationData: any) {
     const userId = await this.getUserIdFromRequest(req);
 
     try {
-      // VALIDATES all sections are complete before allowing final submission
+      // VALIDATE all sections are complete before allowing final submission
       this.validateAcademicSection(applicationData.academics);
       this.validateEducationSection('Primary', applicationData.education?.primary);
       this.validateEducationSection('Secondary', applicationData.education?.secondary);
       this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
 
-      // SAVES any pending data (if not already saved)
+      // SAVE personal details
       if (applicationData.personal) {
         const personalData = this.normalizePersonalPayload(applicationData);
         await this.personalDetailService.upsertByUserId(userId, personalData as any);
       }
       
+      // SAVE family details
       if (applicationData.family) {
         const familyData = this.normalizeFamilyPayload(applicationData.family);
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
       
+      // SAVE academic details
       const academicData = {
         programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
         department: this.toOptionalString(applicationData.academics.department) ?? '',
@@ -479,6 +480,7 @@ export class ReviewController {
       };
       await this.academicDetailService.upsertByUserId(userId, academicData as any);
       
+      // SAVE primary education
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -487,6 +489,7 @@ export class ReviewController {
         );
       }
 
+      // SAVE secondary education
       if (applicationData.education?.secondary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -495,6 +498,7 @@ export class ReviewController {
         );
       }
 
+      // SAVE tertiary education (optional)
       if (applicationData.education?.tertiary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -506,7 +510,7 @@ export class ReviewController {
         );
       }
 
-      // MARK SUBMISSION AS COMPLETE (NOTIFICATIONS ARE HANDLED INSIDE markAsSubmitted)
+      // MARK SUBMISSION AS COMPLETE
       const applicationReference = `APP-${Date.now()}-${userId.slice(0, 8)}`;
       const submission = await this.submissionService.markAsSubmitted(userId, applicationReference);
 
@@ -524,38 +528,4 @@ export class ReviewController {
       });
     }
   }
-
-  // SUBMIT FOR FINAL REVIEW (Legacy - kept for compatibility) 
-  @Post('submit')
-  async submitApplication(@Req() req) {
-    const userId = await this.getUserIdFromRequest(req);
-    
-    const [personalDetails, academicDetails, familyDetails, education] = await Promise.all([
-      this.personalDetailService.findByUserId(userId).catch(() => null),
-      this.academicDetailService.findByUserId(userId).catch(() => null),
-      this.familyService.findByUserId(userId).catch(() => null),
-      this.educationService.findByUserId(userId).catch(() => []),
-    ]);
-
-    const missingSections: string[] = [];
-    if (!personalDetails) missingSections.push('Personal Details');
-    if (!academicDetails) missingSections.push('Academic Details');
-    if (!familyDetails) missingSections.push('Family Details');
-    if (education.length === 0) missingSections.push('Education Information');
-
-    if (missingSections.length > 0) {
-      throw new BadRequestException({
-        message: 'Cannot submit application. Missing required sections.',
-        missingSections,
-      });
-    }
-
-    return {
-      success: true,
-      message: 'Application submitted successfully for final review',
-      submittedAt: new Date(),
-      applicationStatus: 'pending_review',
-    };
-  }
-  
 }
