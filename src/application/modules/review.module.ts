@@ -3,12 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReviewController } from '../controllers/review.controller';
 import { ReviewService } from '../services/review.service';
 import { PersonalDetailService } from '../services/personal_details.service';
-import { AcademicDetailService } from '../services/academic_details.service';
 import { FamilyService } from '../services/family.service';
 import { EducationService } from '../services/education.service';
 import { ApplicationSubmissionService } from '../services/application_submission.service';
 import { PersonalDetails } from '../entities/personal_details.entity';
-import { AcademicDetails } from '../entities/academic_details.entity';
 import { Family } from '../entities/family.entity';
 import { Education } from '../entities/education.entity';
 import { ApplicationSubmission } from '../entities/application_submission.entity';
@@ -20,7 +18,6 @@ import { NotificationModule } from '../../notification/module/notification.modul
   imports: [
     TypeOrmModule.forFeature([
       PersonalDetails,
-      AcademicDetails,
       Family,
       Education,
       ApplicationSubmission,
@@ -32,7 +29,6 @@ import { NotificationModule } from '../../notification/module/notification.modul
   controllers: [ReviewController],
   providers: [
     PersonalDetailService,
-    AcademicDetailService,
     FamilyService,
     EducationService,
     ReviewService,

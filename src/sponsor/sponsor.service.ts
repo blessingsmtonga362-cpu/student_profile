@@ -7,7 +7,6 @@ import { CreateSponsorDto } from './dto/create-sponsor.dto';
 import { FileService } from 'src/file/file.service';
 import { ProfileData } from 'src/application/entities/profile_data';
 import { ReviewService } from 'src/application/services/review.service';
-import { AcademicDetails } from 'src/application/entities/academic_details.entity';
 import { UserService } from 'src/user/user.service';
 import { RankingService } from 'src/ranking/ranking.service';
 
@@ -20,8 +19,6 @@ export class SponsorService {
     private readonly allocationRepo: Repository<SponsorAllocation>,
     @InjectRepository(ProfileData)
     private readonly profileRepo: Repository<ProfileData>,
-    @InjectRepository(AcademicDetails)
-    private readonly academicRepo: Repository<AcademicDetails>,
     private readonly fileService: FileService,
     private readonly reviewService: ReviewService,
     private readonly userService: UserService,
@@ -41,30 +38,21 @@ export class SponsorService {
       return isApproved && !isExcluded;
     });
 
-    const academicDetails = profiles.length
-      ? await this.academicRepo.find({
-          where: profiles.map((profile) => ({ userId: profile.userId })),
-        })
-      : [];
-
-    const academicsByUserId = new Map(academicDetails.map((record) => [record.userId, record]));
-
     const applicants = await Promise.all(
       profiles.map(async (profile) => {
         const readiness = await this.reviewService
-          .canSubmitApplication(profile.userId)
-          .catch(() => ({ completionPercentage: 0 }));
+            .canSubmitApplication(profile.userId)
+            .catch(() => ({ completionPercentage: 0 }));
         const user = await this.userService.findById(profile.userId);
-        const academic = academicsByUserId.get(profile.userId);
 
         return {
           userId: profile.userId,
           name: `${profile.firstName} ${profile.lastName}`.trim(),
           email: user?.email ?? '',
           registrationNumber: profile.registrationNumber,
-          program: academic?.programOfStudy ?? 'Programme not yet submitted',
-          department: academic?.department ?? null,
-          yearOfStudy: academic?.yearOfStudy ?? null,
+          program: 'Programme not submitted',
+          department: null,
+          yearOfStudy: null,
           score: profile.score ?? Math.round(readiness.completionPercentage),
           rank: profile.rank ?? null,
         };
@@ -176,17 +164,11 @@ export class SponsorService {
     const profiles = userIds.length
       ? await this.profileRepo.find({ where: userIds.map((userId) => ({ userId })) })
       : [];
-    const academics = userIds.length
-      ? await this.academicRepo.find({ where: userIds.map((userId) => ({ userId })) })
-      : [];
-
     const profileByUserId = new Map(profiles.map((profile) => [profile.userId, profile]));
-    const academicByUserId = new Map(academics.map((academic) => [academic.userId, academic]));
 
     const applicants = await Promise.all(
       allocations.map(async (allocation) => {
         const profile = profileByUserId.get(allocation.userId);
-        const academic = academicByUserId.get(allocation.userId);
         const user = await this.userService.findById(allocation.userId);
 
         return {
@@ -196,9 +178,9 @@ export class SponsorService {
           name: profile ? `${profile.firstName} ${profile.lastName}`.trim() : 'Unknown Applicant',
           email: user?.email ?? '',
           registrationNumber: profile?.registrationNumber ?? '',
-          program: academic?.programOfStudy ?? 'Programme not yet submitted',
-          department: academic?.department ?? null,
-          yearOfStudy: academic?.yearOfStudy ?? null,
+          program: 'Programme not submitted',
+          department: null,
+          yearOfStudy: null,
         };
       }),
     );

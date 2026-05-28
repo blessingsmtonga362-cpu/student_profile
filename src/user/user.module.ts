@@ -7,10 +7,11 @@ import { UserService } from './user.service';
 import { UserController } from './user.controller';
 import { User } from './entities/user.entity';
 import { EmailModule } from 'src/email/email.module';
+import { PersonalDetails } from 'src/application/entities/personal_details.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, PersonalDetails]),
     ConfigModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({

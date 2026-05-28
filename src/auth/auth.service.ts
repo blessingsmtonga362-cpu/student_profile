@@ -59,7 +59,6 @@ export class AuthService {
         role: user.role === 'admin' ? 'admin' : 'student',
         firstName: user.firstName,
         lastName: user.lastName,
-        registrationNumber: user.registrationNumber,
       },
     };
   }

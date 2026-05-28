@@ -13,11 +13,9 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { PersonalDetailService } from '../services/personal_details.service';
-import { AcademicDetailService } from '../services/academic_details.service';
 import { FamilyService } from '../services/family.service';
 import { EducationService } from '../services/education.service';
 import { UpdatePersonalDetailDto } from '../dto/create_personal_details.dto';
-import { UpdateAcademicDetailDto } from '../dto/create_academic_details.dto';
 import { UpdateFamilyDto } from '../dto/create_family.dto';
 import { UpdateEducationDto } from '../dto/education/update-education.dto';
 import { UserService } from '../../user/user.service'; 
@@ -31,7 +29,6 @@ import { ApplicationStatus } from '../entities/application_submission.entity';
 export class ReviewController {
   constructor(
     private readonly personalDetailService: PersonalDetailService,
-    private readonly academicDetailService: AcademicDetailService,
     private readonly familyService: FamilyService,
     private readonly educationService: EducationService,
     private readonly userService: UserService,
@@ -134,44 +131,6 @@ export class ReviewController {
     }
   }
 
-  private hasAnyAcademicValue(academicData: any): boolean {
-    if (!academicData || typeof academicData !== 'object') return false;
-
-    return [
-      academicData.programOfStudy,
-      academicData.department,
-      academicData.yearOfStudy,
-    ].some((value) => this.toOptionalString(value) !== undefined || this.toOptionalNumber(value) !== undefined);
-  }
-
-  private validateAcademicSection(academicData: any) {
-    if (!this.hasAnyAcademicValue(academicData)) {
-      throw new BadRequestException(
-        'Academic details are required. Please provide program of study, department, and year of study.',
-      );
-    }
-
-    const missingFields: string[] = [];
-
-    if (!this.toOptionalString(academicData?.programOfStudy)) {
-      missingFields.push('program of study');
-    }
-
-    if (!this.toOptionalString(academicData?.department)) {
-      missingFields.push('department');
-    }
-
-    if (this.toOptionalNumber(academicData?.yearOfStudy) === undefined) {
-      missingFields.push('year of study');
-    }
-
-    if (missingFields.length > 0) {
-      throw new BadRequestException(
-        `Academic details are incomplete. Please provide ${missingFields.join(', ')}.`,
-      );
-    }
-  }
-
   private normalizePersonalPayload(applicationData: any) {
     const personal = applicationData.personal ?? {};
     const payment = applicationData.payment ?? {};
@@ -261,9 +220,8 @@ export class ReviewController {
   async getMyCompleteApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
     
-    const [personalDetails, academicDetails, familyDetails, education] = await Promise.all([
+    const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
-      this.academicDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
       this.educationService.findByUserId(userId).catch((): Education[] => []),
     ]);
@@ -272,7 +230,6 @@ export class ReviewController {
       success: true,
       data: {
         personalDetails,
-        academicDetails,
         familyDetails,
         education: {
           primary: education.filter(e => e.educationLevel === 'primary'),
@@ -309,50 +266,6 @@ export class ReviewController {
     return {
       success: true,
       message: 'Personal details deleted successfully',
-    };
-  }
-
-  //ACADEMIC DETAILS REVIEW
-  @Get('academic-details')
-  async getAcademicDetails(@Req() req) {
-    const userId = await this.getUserIdFromRequest(req);
-    return await this.academicDetailService.findByUserId(userId);
-  }
-
-  @Put('academic-details/:id')
-  async updateAcademicDetails(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateAcademicDetailDto,
-    @Req() req
-  ) {
-    const userId = await this.getUserIdFromRequest(req);
-    const academicDetail = await this.academicDetailService.findOne(id);
-    
-    if (academicDetail.userId !== userId) {
-      throw new BadRequestException('You can only update your own academic details');
-    }
-    
-    const updated = await this.academicDetailService.update(id, updateDto);
-    return {
-      success: true,
-      message: 'Academic details updated successfully',
-      data: updated,
-    };
-  }
-
-  @Delete('academic-details/:id')
-  async deleteAcademicDetails(@Param('id') id: string, @Req() req) {
-    const userId = await this.getUserIdFromRequest(req);
-    const academicDetail = await this.academicDetailService.findOne(id);
-    
-    if (academicDetail.userId !== userId) {
-      throw new BadRequestException('You can only delete your own academic details');
-    }
-    
-    await this.academicDetailService.remove(id);
-    return {
-      success: true,
-      message: 'Academic details deleted successfully',
     };
   }
 
@@ -456,7 +369,6 @@ export class ReviewController {
 
     try {
       // VALIDATES all sections are complete before allowing final submission
-      this.validateAcademicSection(applicationData.academics);
       this.validateEducationSection('Primary', applicationData.education?.primary);
       this.validateEducationSection('Secondary', applicationData.education?.secondary);
       this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
@@ -471,13 +383,6 @@ export class ReviewController {
         const familyData = this.normalizeFamilyPayload(applicationData.family);
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
-      
-      const academicData = {
-        programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
-        department: this.toOptionalString(applicationData.academics.department) ?? '',
-        yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
-      };
-      await this.academicDetailService.upsertByUserId(userId, academicData as any);
       
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
@@ -530,16 +435,14 @@ export class ReviewController {
   async submitApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
     
-    const [personalDetails, academicDetails, familyDetails, education] = await Promise.all([
+    const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
-      this.academicDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
       this.educationService.findByUserId(userId).catch(() => []),
     ]);
 
     const missingSections: string[] = [];
     if (!personalDetails) missingSections.push('Personal Details');
-    if (!academicDetails) missingSections.push('Academic Details');
     if (!familyDetails) missingSections.push('Family Details');
     if (education.length === 0) missingSections.push('Education Information');
 
