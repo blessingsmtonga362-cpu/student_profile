@@ -257,7 +257,15 @@ export class AdminService {
         status: this.normalizeProfileStatus(profile.status),
         reviewComments: profile.reviewComments ?? null,
       },
-      application: application.data,
+      application: {
+        ...application.data,
+        familyDetails: application.data.familyDetails
+          ? {
+              ...application.data.familyDetails,
+              consentFormUrl: (application.data.familyDetails as any).consentFormUrl ?? null,
+            }
+          : null,
+      },
       applicationMeta: application.metadata,
       verificationLogs,
     };
@@ -272,7 +280,12 @@ export class AdminService {
       },
     );
 
-    return result.notifications;
+    return {
+      success: true,
+      data: result.notifications,
+      total: result.total,
+      unreadCount: result.unreadCount,
+    };
   }
 
   async markAdminNotificationRead(notificationId: string, adminId: string) {

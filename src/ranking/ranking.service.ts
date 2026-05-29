@@ -195,11 +195,13 @@ export class RankingService {
   }
 
   async checkExternalStudentDataConnection() {
-    const url = this.getUnimaApiBaseUrl();
+    // Test UNIMA API by hitting the /student-data endpoint (returns empty list when no data, not 404)
+    const url = `${this.getUnimaApiBaseUrl()}/student-data`;
     return this.checkConnection(url);
   }
 
   async checkNrbConnection() {
+    // Test NRB API by hitting /nrb which lists all records
     const url = `${this.getNrbApiBaseUrl()}/nrb`;
     return this.checkConnection(url);
   }
@@ -500,6 +502,115 @@ export class RankingService {
       profile.scoreFlagged = rankings[rankings.length - 1].isFlagged;
       profile.scoreFlagReason = primaryFlagReason ?? '';
       profile.scoreUpdatedAt = new Date();
+
+      // ── Auto-flag logic ──────────────────────────────────────────────────────
+      // Automatically move a profile to 'flagged' when the scoring engine
+      // detects a verifiable problem that requires admin attention.
+      // Only applies to profiles that have NOT already been manually reviewed
+      // (approved or flagged) by an admin — we never override a human decision.
+      const isManuallyReviewed =
+        profile.status === 'approved' || profile.status === 'flagged';
+
+      if (!isManuallyReviewed) {
+        // Collect every specific reason that warrants an auto-flag
+        const autoFlagReasons: string[] = [];
+
+        // 1. Student not found in UNIMA school database
+        if (!academicScore.foundInSchoolDatabase) {
+          autoFlagReasons.push(
+            academicScore.flagReason ?? 'Student not found in UNIMA school database',
+          );
+        }
+
+        // 2. Student's own national ID — missing, invalid format, or not in NRB
+        if (!personalDetail.nationalIdNumber?.trim()) {
+          autoFlagReasons.push("Student national ID not provided");
+        } else if (!/^[A-Z0-9]{3,50}$/i.test(personalDetail.nationalIdNumber.trim())) {
+          autoFlagReasons.push(
+            `Student national ID "${personalDetail.nationalIdNumber}" has an invalid format`,
+          );
+        } else if (integrityScore.nationalIdVerified === 0) {
+          // The integrity check already hit NRB and it failed — extract the
+          // specific reason from the integrity flag string if available
+          const nidReason = integrityScore.flagReason
+            ?.split('; ')
+            .find((r) => r.toLowerCase().includes('national id') && !r.toLowerCase().includes('parent'));
+          autoFlagReasons.push(
+            nidReason ?? `Student national ID "${personalDetail.nationalIdNumber}" not verified in NRB`,
+          );
+        }
+
+        // 3. Living parent / guardian national ID — missing, invalid, or not in NRB
+        //    Collect all living-parent IDs that were submitted
+        const livingParentIds: Array<{ label: string; id: string }> = [
+          family?.fatherNationalId ? { label: 'Father', id: family.fatherNationalId } : null,
+          family?.motherNationalId ? { label: 'Mother', id: family.motherNationalId } : null,
+          family?.parentNationalId ? { label: 'Parent', id: family.parentNationalId } : null,
+          family?.guardianNationalId ? { label: 'Guardian', id: family.guardianNationalId } : null,
+        ].filter((x): x is { label: string; id: string } => x !== null);
+
+        if (livingParentIds.length === 0 && !family) {
+          autoFlagReasons.push('No family/guardian information provided');
+        } else {
+          for (const { label, id } of livingParentIds) {
+            const trimmed = id.trim();
+            if (!trimmed) {
+              autoFlagReasons.push(`${label} national ID is empty`);
+            } else if (!/^[A-Z0-9]{3,50}$/i.test(trimmed)) {
+              autoFlagReasons.push(`${label} national ID "${trimmed}" has an invalid format`);
+            }
+            // NRB lookup failures for parent IDs are already captured in
+            // integrityScore.flagReason — we surface them below
+          }
+        }
+
+        // 4. Deceased parent IDs — missing from NRB or not marked deceased
+        const deceasedIds = [
+          family?.deceasedFatherId ? { label: 'Deceased father', id: family.deceasedFatherId } : null,
+          family?.deceasedMotherId ? { label: 'Deceased mother', id: family.deceasedMotherId } : null,
+          family?.deceasedParentId ? { label: 'Deceased parent', id: family.deceasedParentId } : null,
+        ].filter((x): x is { label: string; id: string } => x !== null);
+
+        for (const { label, id } of deceasedIds) {
+          const trimmed = id.trim();
+          if (!trimmed) {
+            autoFlagReasons.push(`${label} national ID is empty`);
+          } else if (!/^[A-Z0-9]{3,50}$/i.test(trimmed)) {
+            autoFlagReasons.push(`${label} national ID "${trimmed}" has an invalid format`);
+          }
+          // NRB deceased-status failures are captured in integrityScore.flagReason
+        }
+
+        // 5. Any remaining integrity-check NRB failures (parent IDs not in NRB,
+        //    deceased status mismatches, death-verification failures) that weren't
+        //    already covered by the format checks above
+        if (integrityScore.isFlagged && integrityScore.flagReason) {
+          const integrityReasons = integrityScore.flagReason
+            .split('; ')
+            .filter((r) => {
+              const lower = r.toLowerCase();
+              // Skip reasons already added above
+              return (
+                !lower.includes('registration number') &&
+                !(lower.includes('national id') && !lower.includes('parent') && !lower.includes('guardian'))
+              );
+            });
+          autoFlagReasons.push(...integrityReasons);
+        }
+
+        if (autoFlagReasons.length > 0) {
+          profile.status = 'flagged';
+          // Deduplicate reasons and build the comment
+          const uniqueReasons = [...new Set(autoFlagReasons)];
+          profile.reviewComments =
+            profile.reviewComments?.trim() ||
+            `Auto-flagged: ${uniqueReasons.join('; ')}`;
+          // Also persist the full flag reason for the score breakdown panel
+          profile.scoreFlagReason = uniqueReasons.join('; ');
+        }
+      }
+      // ── End auto-flag logic ──────────────────────────────────────────────────
+
       profileMap.set(user.id, profile);
     }
 
@@ -591,7 +702,16 @@ export class RankingService {
     try {
       const response = await this.fetchWithTimeout(`${this.getUnimaApiBaseUrl()}/student-data/${encodeURIComponent(registrationNumber)}`);
       if (response.status === 404 || !response.ok) return null;
-      return (await response.json()) as SchoolStudentRecord;
+
+      // UNIMA API returns an empty body (not 404) when a student is not found
+      const text = await response.text();
+      if (!text || text.trim() === '' || text.trim() === 'null') return null;
+
+      try {
+        return JSON.parse(text) as SchoolStudentRecord;
+      } catch {
+        return null;
+      }
     } catch {
       return null;
     }

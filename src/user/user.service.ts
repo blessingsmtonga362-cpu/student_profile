@@ -41,10 +41,10 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
-      ...userData,
+      ...createUserDto,
+      university: createUserDto.university ?? 'unima',
       password: hashedPassword,
       role: Role.User,
       isEmailVerified: true, // Direct creation - already verified
@@ -66,10 +66,10 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
-      ...userData,
+      ...createUserDto,
+      university: createUserDto.university ?? 'unima',
       password: hashedPassword,
       role: Role.User,
       otp: otp,
@@ -91,7 +91,6 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
-    const { registrationNumber, ...userData } = createUser;
     
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -103,7 +102,8 @@ export class UserService {
     otpExpiry.setMilliseconds(0);
 
     const user = this.userRepository.create({ 
-      ...userData, 
+      ...createUser, 
+      university: createUser.university ?? 'unima',
       password: hashedPassword,
       role: Role.User,
       otp: otp,
