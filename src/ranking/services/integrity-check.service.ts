@@ -87,7 +87,21 @@ export class IntegrityCheckService {
         return 0;
       }
 
-      const json = await resp.json();
+      // UNIMA API returns an empty body (not 404) when a student is not found
+      const text = await resp.text();
+      if (!text || text.trim() === '' || text.trim() === 'null') {
+        flagReasons.push('Registration number not found in school database');
+        return 0;
+      }
+
+      let json: any;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        flagReasons.push('Unable to verify registration number with school API');
+        return 0;
+      }
+
       if ((json.registrationNumber || '').toString().trim().toLowerCase() !== normalized.toLowerCase()) {
         flagReasons.push('Registration number mismatch with school database');
         return 0;
@@ -124,11 +138,9 @@ export class IntegrityCheckService {
       }
 
       const json = await resp.json();
-      const exists =
-        json?.found === true ||
-        json?.exists === true ||
-        (typeof json?.status === 'string' && json.status.trim().toLowerCase() === 'active') ||
-        Boolean(json?.nationalId || json?.nationalIdNumber || json?.id);
+      // NRB API returns { nationalId, fullName, status: "alive" | "deceased" }
+      // A record exists if nationalId is present in the response
+      const exists = Boolean(json?.nationalId || json?.nationalIdNumber || json?.id);
 
       if (!exists) {
         flagReasons.push('National ID not found in NRB response');
@@ -202,8 +214,15 @@ export class IntegrityCheckService {
         } else {
           const resp = await this.fetchWithTimeout(`${this.getUnimaApiBaseUrl()}/student-data/${encodeURIComponent(nationalIdOrRegistration.trim())}`);
           if (resp.ok) {
-            const json = await resp.json();
-            nationalId = json.nationalId || json.nationalIdNumber || null;
+            const text = await resp.text();
+            if (text && text.trim() !== '' && text.trim() !== 'null') {
+              try {
+                const json = JSON.parse(text);
+                nationalId = json.nationalId || json.nationalIdNumber || null;
+              } catch {
+                // ignore parse error
+              }
+            }
           }
         }
       }

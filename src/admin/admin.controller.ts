@@ -30,7 +30,7 @@ export class AdminController {
     @Body() createAdminDto: CreateAdminDto,
     @Req() req,
   ) {
-    return this.adminService.reviewApplication(userId, createAdminDto, req.user.userId);
+    return this.adminService.reviewApplication(userId, createAdminDto, req.user.id);
   }
 
   @Roles(Role.Admin)
@@ -54,24 +54,24 @@ export class AdminController {
   @Roles(Role.Admin)
   @Get('notifications')
   getNotifications(@Req() req) {
-    return this.adminService.getAdminNotifications(req.user.userId);
+    return this.adminService.getAdminNotifications(req.user.id);
   }
 
   @Roles(Role.Admin)
   @Patch('notifications/:notificationId/read')
   markNotificationAsRead(@Param('notificationId') notificationId: string, @Req() req) {
-    return this.adminService.markAdminNotificationRead(notificationId, req.user.userId);
+    return this.adminService.markAdminNotificationRead(notificationId, req.user.id);
   }
 
   @Roles(Role.Admin)
   @Patch('notifications/read-all')
   markAllNotificationsAsRead(@Req() req) {
-    return this.adminService.markAllAdminNotificationsRead(req.user.userId);
+    return this.adminService.markAllAdminNotificationsRead(req.user.id);
   }
 
   @Roles(Role.Admin)
   @Delete('notifications')
   clearNotifications(@Req() req) {
-    return this.adminService.clearAdminNotifications(req.user.userId);
+    return this.adminService.clearAdminNotifications(req.user.id);
   }
 }

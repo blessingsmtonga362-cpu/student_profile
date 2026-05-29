@@ -44,7 +44,8 @@ export class UserService {
     const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
-      ...userData,
+      ...createUserDto,
+      university: createUserDto.university ?? 'unima',
       password: hashedPassword,
       role: Role.User,
       isEmailVerified: true, // Direct creation - already verified
@@ -69,7 +70,8 @@ export class UserService {
     const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
-      ...userData,
+      ...createUserDto,
+      university: createUserDto.university ?? 'unima',
       password: hashedPassword,
       role: Role.User,
       otp: otp,
@@ -103,7 +105,8 @@ export class UserService {
     otpExpiry.setMilliseconds(0);
 
     const user = this.userRepository.create({ 
-      ...userData, 
+      ...createUser, 
+      university: createUser.university ?? 'unima',
       password: hashedPassword,
       role: Role.User,
       otp: otp,

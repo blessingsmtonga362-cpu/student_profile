@@ -267,7 +267,7 @@ export class ReviewController {
     };
   }
 
-  //Kuonga maditelu a abanja lakwanu
+
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -382,7 +382,6 @@ export class ReviewController {
         const familyData = this.normalizeFamilyPayload(applicationData.family);
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
-      
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
