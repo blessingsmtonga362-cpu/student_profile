@@ -37,16 +37,8 @@ export class AdminService {
     private readonly reviewService: ReviewService,
     private readonly notificationService: StudentNotificationService,
     private readonly userService: UserService,
-<<<<<<< HEAD
-    @InjectRepository(ApplicationSubmission)
-    private submissionRepository?: Repository<ApplicationSubmission>,
     private readonly submissionService?: ApplicationSubmissionService,
     private readonly rankingService?: RankingService,
-=======
-    private readonly rankingService: RankingService,
-    @Inject(forwardRef(() => ApplicationSubmissionService))
-    private readonly submissionService: ApplicationSubmissionService,
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
   ) {}
 
   private normalizeProfileStatus(status?: string | null): string {
@@ -101,10 +93,6 @@ export class AdminService {
     let profile = await this.profileRepo.findOne({
       where: { userId },
     });
-<<<<<<< HEAD
-=======
-
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
     if (!profile) {
       profile = this.profileRepo.create({ userId });
     }
@@ -270,12 +258,9 @@ export class AdminService {
         scoreFlagReason: profile.scoreFlagReason ?? null,
         status: this.normalizeProfileStatus(profile.status),
         reviewComments: profile.reviewComments ?? null,
-<<<<<<< HEAD
         program: academic?.programOfStudy ?? 'Programme not yet submitted',
         department: academic?.department ?? null,
         yearOfStudy: academic?.yearOfStudy ?? null,
-=======
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
       },
       application: application.data,
       applicationMeta: application.metadata,
@@ -284,12 +269,6 @@ export class AdminService {
   }
 
   async getAdminNotifications(adminId: string) {
-<<<<<<< HEAD
-    const result = await this.notificationService.getUserNotifications(adminId, {
-      limit: 50,
-      offset: 0,
-    });
-=======
     const result = await this.notificationService.getUserNotifications(
       adminId,
       {
@@ -297,7 +276,6 @@ export class AdminService {
         offset: 0,
       },
     );
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
 
     return result.notifications;
   }
@@ -313,16 +291,7 @@ export class AdminService {
   async clearAdminNotifications(adminId: string) {
     return this.notificationService.deleteAllNotifications(adminId);
   }
-
-<<<<<<< HEAD
   async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId: string) {
-=======
-  async reviewApplication(
-    userId: string,
-    createAdminDto: CreateAdminDto,
-    adminId: string,
-  ) {
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
     const normalizedStatus = this.normalizeProfileStatus(createAdminDto.status);
 
     if (
@@ -355,7 +324,6 @@ export class AdminService {
     profile.reviewComments = reviewComment ?? '';
 
     await this.profileRepo.save(profile);
-<<<<<<< HEAD
 
     const commentForUpdate = reviewComment === null ? undefined : reviewComment;
 
@@ -396,7 +364,6 @@ export class AdminService {
         metadata: { userId, adminId, status: normalizedStatus },
       });
     }
-=======
     await this.updateSubmissionStatus(
       userId,
       normalizedStatus,
@@ -404,7 +371,6 @@ export class AdminService {
       adminId,
     );
     await this.notifyStudent(userId, normalizedStatus, reviewComment, adminId);
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
 
     return {
       message: 'Application reviewed successfully',

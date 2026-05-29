@@ -218,7 +218,6 @@ export class ReviewController {
   @Get('my-application')
   async getMyCompleteApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
-    
     const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
@@ -268,55 +267,7 @@ export class ReviewController {
     };
   }
 
-<<<<<<< HEAD
-  // ========== ACADEMIC DETAILS ==========
-  @Get('academic-details')
-  async getAcademicDetails(@Req() req) {
-    const userId = await this.getUserIdFromRequest(req);
-    return await this.academicDetailService.findByUserId(userId);
-  }
-
-  @Put('academic-details/:id')
-  async updateAcademicDetails(
-    @Param('id') id: string,
-    @Body() updateDto: UpdateAcademicDetailDto,
-    @Req() req
-  ) {
-    const userId = await this.getUserIdFromRequest(req);
-    const academicDetail = await this.academicDetailService.findOne(id);
-    
-    if (academicDetail.userId !== userId) {
-      throw new BadRequestException('You can only update your own academic details');
-    }
-    
-    const updated = await this.academicDetailService.update(id, updateDto);
-    return {
-      success: true,
-      message: 'Academic details updated successfully',
-      data: updated,
-    };
-  }
-
-  @Delete('academic-details/:id')
-  async deleteAcademicDetails(@Param('id') id: string, @Req() req) {
-    const userId = await this.getUserIdFromRequest(req);
-    const academicDetail = await this.academicDetailService.findOne(id);
-    
-    if (academicDetail.userId !== userId) {
-      throw new BadRequestException('You can only delete your own academic details');
-    }
-    
-    await this.academicDetailService.remove(id);
-    return {
-      success: true,
-      message: 'Academic details deleted successfully',
-    };
-  }
-
-  // ========== FAMILY DETAILS ==========
-=======
   //Kuonga maditelu a abanja lakwanu
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -415,12 +366,7 @@ export class ReviewController {
     const userId = await this.getUserIdFromRequest(req);
 
     try {
-<<<<<<< HEAD
-      // VALIDATE all sections are complete before allowing final submission
-      this.validateAcademicSection(applicationData.academics);
-=======
       // VALIDATES all sections are complete before allowing final submission
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
       this.validateEducationSection('Primary', applicationData.education?.primary);
       this.validateEducationSection('Secondary', applicationData.education?.secondary);
       this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
@@ -437,18 +383,6 @@ export class ReviewController {
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
       
-<<<<<<< HEAD
-      // SAVE academic details
-      const academicData = {
-        programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
-        department: this.toOptionalString(applicationData.academics.department) ?? '',
-        yearOfStudy: this.toOptionalNumber(applicationData.academics.yearOfStudy) ?? 1,
-      };
-      await this.academicDetailService.upsertByUserId(userId, academicData as any);
-      
-      // SAVE primary education
-=======
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -496,14 +430,12 @@ export class ReviewController {
       });
     }
   }
-<<<<<<< HEAD
-}
-=======
 
   // SUBMIT FOR FINAL REVIEW (Legacy - kept for compatibility) 
   @Post('submit')
   async submitApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
+    
     
     const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
@@ -532,4 +464,4 @@ export class ReviewController {
   }
   
 }
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
+

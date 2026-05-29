@@ -13,7 +13,7 @@ export class StudentNotificationController {
   async getMyNotifications(@Req() req, @Query() query: NotificationQueryDto) {
     const userId = req.user.id;
     const result = await this.notificationService.getUserNotifications(userId, query);
-    
+
     return {
       success: true,
       data: result.notifications,
@@ -27,7 +27,7 @@ export class StudentNotificationController {
   async getUnreadCount(@Req() req) {
     const userId = req.user.id;
     const unreadCount = await this.notificationService.getUnreadCount(userId);
-    
+
     return {
       success: true,
       unreadCount,
@@ -39,7 +39,7 @@ export class StudentNotificationController {
   async getUnreadNotifications(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.getUserNotifications(userId, { isRead: false });
-    
+
     return {
       success: true,
       data: result.notifications,
@@ -52,7 +52,7 @@ export class StudentNotificationController {
   async markAsRead(@Param('notificationId') notificationId: string, @Req() req) {
     const userId = req.user.id;
     const notification = await this.notificationService.markAsRead(notificationId, userId);
-    
+
     return {
       success: true,
       message: 'Notification marked as read',
@@ -60,25 +60,14 @@ export class StudentNotificationController {
     };
   }
 
- 
- @Patch('read-all')
-  async markAllAsReadPatch(@Req() req) {
-    const userId = req.user.id;
-    const result = await this.notificationService.markAllAsRead(userId);
-    
-    return {
-      success: true,
-      message: `${result.count} notifications marked as read`,
-      count: result.count,
-    };
-  }
-
-  // Keep your existing POST endpoint for backward compatibility
+  // Mark all notifications as have been red
   @Post('mark-all-read')
+  // Mark all notifications as have been read
+  @Patch('read-all')
   async markAllAsRead(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.markAllAsRead(userId);
-    
+
     return {
       success: true,
       message: `${result.count} notifications marked as read`,
@@ -91,32 +80,19 @@ export class StudentNotificationController {
   async deleteNotification(@Param('notificationId') notificationId: string, @Req() req) {
     const userId = req.user.id;
     await this.notificationService.deleteNotification(notificationId, userId);
-    
+
     return {
       success: true,
       message: 'Notification deleted successfully',
     };
   }
 
-  // ✅ ADD THIS - Match frontend's DELETE /student/notifications
-  @Delete()
+  // Delete all notifications (Clear all)
+  @Delete('clear-all')
   async clearAllNotifications(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.deleteAllNotifications(userId);
-    
-    return {
-      success: true,
-      message: 'All notifications cleared',
-      count: result.count,
-    };
-  }
 
-  // Keep your existing DELETE endpoint for backward compatibility
-  @Delete('clear-all')
-  async clearAllNotificationsAlt(@Req() req) {
-    const userId = req.user.id;
-    const result = await this.notificationService.deleteAllNotifications(userId);
-    
     return {
       success: true,
       message: 'All notifications cleared',
@@ -129,7 +105,7 @@ export class StudentNotificationController {
   async getNotificationById(@Param('notificationId') notificationId: string, @Req() req) {
     const userId = req.user.id;
     const notification = await this.notificationService.getNotificationById(notificationId, userId);
-    
+
     return {
       success: true,
       data: notification,
