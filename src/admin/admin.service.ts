@@ -37,16 +37,14 @@ export class AdminService {
     private readonly reviewService: ReviewService,
     private readonly notificationService: StudentNotificationService,
     private readonly userService: UserService,
-<<<<<<< HEAD
-    @InjectRepository(ApplicationSubmission)
-    private submissionRepository?: Repository<ApplicationSubmission>,
-    private readonly submissionService?: ApplicationSubmissionService,
-    private readonly rankingService?: RankingService,
-=======
     private readonly rankingService: RankingService,
     @Inject(forwardRef(() => ApplicationSubmissionService))
     private readonly submissionService: ApplicationSubmissionService,
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
+
+    private readonly rankingService: RankingService,
+    @Inject(forwardRef(() => ApplicationSubmissionService))
+    private readonly submissionService: ApplicationSubmissionService,
+
   ) {}
 
   private normalizeProfileStatus(status?: string | null): string {
@@ -101,10 +99,10 @@ export class AdminService {
     let profile = await this.profileRepo.findOne({
       where: { userId },
     });
-<<<<<<< HEAD
-=======
 
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
+
+
+
     if (!profile) {
       profile = this.profileRepo.create({ userId });
     }
@@ -270,26 +268,23 @@ export class AdminService {
         scoreFlagReason: profile.scoreFlagReason ?? null,
         status: this.normalizeProfileStatus(profile.status),
         reviewComments: profile.reviewComments ?? null,
-<<<<<<< HEAD
-        program: academic?.programOfStudy ?? 'Programme not yet submitted',
-        department: academic?.department ?? null,
-        yearOfStudy: academic?.yearOfStudy ?? null,
-=======
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
+
       },
-      application: application.data,
+      application: {
+        ...application.data,
+        familyDetails: application.data.familyDetails
+          ? {
+              ...application.data.familyDetails,
+              consentFormUrl: (application.data.familyDetails as any).consentFormUrl ?? null,
+            }
+          : null,
+      },
       applicationMeta: application.metadata,
       verificationLogs,
     };
   }
 
   async getAdminNotifications(adminId: string) {
-<<<<<<< HEAD
-    const result = await this.notificationService.getUserNotifications(adminId, {
-      limit: 50,
-      offset: 0,
-    });
-=======
     const result = await this.notificationService.getUserNotifications(
       adminId,
       {
@@ -297,9 +292,13 @@ export class AdminService {
         offset: 0,
       },
     );
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
 
-    return result.notifications;
+    return {
+      success: true,
+      data: result.notifications,
+      total: result.total,
+      unreadCount: result.unreadCount,
+    };
   }
 
   async markAdminNotificationRead(notificationId: string, adminId: string) {
@@ -314,15 +313,11 @@ export class AdminService {
     return this.notificationService.deleteAllNotifications(adminId);
   }
 
-<<<<<<< HEAD
-  async reviewApplication(userId: string, createAdminDto: CreateAdminDto, adminId: string) {
-=======
   async reviewApplication(
     userId: string,
     createAdminDto: CreateAdminDto,
     adminId: string,
   ) {
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
     const normalizedStatus = this.normalizeProfileStatus(createAdminDto.status);
 
     if (
@@ -355,48 +350,6 @@ export class AdminService {
     profile.reviewComments = reviewComment ?? '';
 
     await this.profileRepo.save(profile);
-<<<<<<< HEAD
-
-    const commentForUpdate = reviewComment === null ? undefined : reviewComment;
-
-    if (this.submissionService && normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
-      try {
-        await this.submissionService.updateStatus(userId, ApplicationStatus.APPROVED, commentForUpdate, adminId);
-      } catch (error) {
-        console.error('Failed to update submission status:', error);
-      }
-    } else if (this.submissionService && normalizedStatus === AdminApplicationReviewStatus.FLAGGED) {
-      try {
-        await this.submissionService.updateStatus(userId, ApplicationStatus.REJECTED, commentForUpdate, adminId);
-      } catch (error) {
-        console.error('Failed to update submission status:', error);
-      }
-    }
-
-    if (normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
-      await this.notificationService.createNotification({
-        userId,
-        userRole: UserRole.STUDENT,
-        title: 'Application Approved',
-        message: reviewComment
-          ? `Your application has been approved. Reviewer comment: ${reviewComment}`
-          : 'Your application has been approved.',
-        type: NotificationType.APPLICATION_APPROVED,
-        priority: NotificationPriority.HIGH,
-        metadata: { userId, adminId, status: normalizedStatus },
-      });
-    } else {
-      await this.notificationService.createNotification({
-        userId,
-        userRole: UserRole.STUDENT,
-        title: 'Application Requires Attention',
-        message: `Your application has been flagged for review. Comment: ${reviewComment}`,
-        type: NotificationType.APPLICATION_REJECTED,
-        priority: NotificationPriority.HIGH,
-        metadata: { userId, adminId, status: normalizedStatus },
-      });
-    }
-=======
     await this.updateSubmissionStatus(
       userId,
       normalizedStatus,
@@ -404,7 +357,6 @@ export class AdminService {
       adminId,
     );
     await this.notifyStudent(userId, normalizedStatus, reviewComment, adminId);
->>>>>>> 513662868beea244377ed274fc950a3f6a327fca
 
     return {
       message: 'Application reviewed successfully',
@@ -417,6 +369,72 @@ export class AdminService {
         reviewComments: reviewComment,
       },
     };
+  }
+
+  private async updateSubmissionStatus(
+    userId: string,
+    normalizedStatus: string,
+    reviewComment: string | null,
+    adminId: string,
+  ) {
+    const submissionStatus =
+      normalizedStatus === AdminApplicationReviewStatus.APPROVED
+        ? ApplicationStatus.APPROVED
+        : ApplicationStatus.REJECTED;
+
+    try {
+      await this.submissionService.updateStatus(
+        userId,
+        submissionStatus,
+        reviewComment ?? undefined,
+        adminId,
+      );
+    } catch (error) {
+      if (!(error instanceof NotFoundException)) {
+        throw error;
+      }
+    }
+  }
+
+  private async notifyStudent(
+    userId: string,
+    normalizedStatus: string,
+    reviewComment: string | null,
+    adminId: string,
+  ) {
+    if (normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
+      await this.notificationService.createNotification({
+        userId,
+        userRole: UserRole.STUDENT,
+        title: 'Application Approved',
+        message: reviewComment
+          ? `Your application has been approved. Reviewer comment: ${reviewComment}`
+          : 'Your application has been approved.',
+        type: NotificationType.APPLICATION_APPROVED,
+        priority: NotificationPriority.HIGH,
+        metadata: { userId, adminId, status: normalizedStatus },
+      });
+      return;
+    }
+
+    await this.updateSubmissionStatus(
+      userId,
+      normalizedStatus,
+      reviewComment,
+      adminId,
+    );
+    await this.notifyStudent(userId, normalizedStatus, reviewComment, adminId);
+
+
+    await this.notificationService.createNotification({
+      userId,
+      userRole: UserRole.STUDENT,
+      title: 'Application Requires Attention',
+      message: `Your application has been flagged for review. Comment: ${reviewComment}`,
+      type: NotificationType.APPLICATION_REJECTED,
+      priority: NotificationPriority.HIGH,
+      metadata: { userId, adminId, status: normalizedStatus },
+    });
   }
 
   private async updateSubmissionStatus(
