@@ -13,6 +13,7 @@ import { NotificationModule } from './notification/module/notification.module';
 import { EmailModule } from './email/email.module';
 import { SponsorModule } from './sponsor/sponsor.module';
 import { RankingModule } from './ranking/ranking.module';
+import { PaychanguModule } from './paychangu/paychangu.module';
 
 const envFilePath = join(process.cwd(), '.env');
 
@@ -28,7 +29,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     'DB_PORT',
     'DB_USERNAME',
     'DB_PASSWORD',
-    'DB_NAME',  // ✅ Changed from DB_NAME to DB_NAME (keep as is)
+    'DB_NAME', // ✅ Changed from DB_NAME to DB_NAME (keep as is)
     'JWT_SECRET',
   ] as const;
 
@@ -45,7 +46,9 @@ function validateEnv(config: Record<string, string | undefined>) {
 
   const dbPort = Number(config.DB_PORT);
   if (!Number.isInteger(dbPort) || dbPort <= 0) {
-    throw new Error(`Invalid DB_PORT value "${config.DB_PORT}". Expected a positive integer.`);
+    throw new Error(
+      `Invalid DB_PORT value "${config.DB_PORT}". Expected a positive integer.`,
+    );
   }
 
   return config;
@@ -66,10 +69,10 @@ function validateEnv(config: Record<string, string | undefined>) {
         port: Number(configService.get<string>('DB_PORT', '5432')),
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', '2001'),
-        database: configService.get<string>('DB_NAME', 'student-db'), // 
+        database: configService.get<string>('DB_NAME', 'student-db'), //
         autoLoadEntities: true,
         synchronize: configService.get<string>('DB_SYNC', 'true') === 'true',
-        logging: configService.get<string>('DB_LOGGING', 'true') === 'true',
+        logging: configService.get<string>('DB_LOGGING', 'false') === 'true',
       }),
     }),
     UserModule,
@@ -81,6 +84,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     EmailModule,
     SponsorModule,
     RankingModule,
+    PaychanguModule,
   ],
 })
 export class AppModule implements OnModuleInit {
@@ -90,7 +94,10 @@ export class AppModule implements OnModuleInit {
     try {
       await this.userService.createAdmin();
     } catch (error) {
-      console.error('Failed to seed admin user:', error instanceof Error ? error.message : error);
+      console.error(
+        'Failed to seed admin user:',
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 }

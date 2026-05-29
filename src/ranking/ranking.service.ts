@@ -5,7 +5,6 @@ import { In, Repository } from 'typeorm';
 import { Family } from '../application/entities/family.entity';
 import { Education, EducationLevel } from '../application/entities/education.entity';
 import { PersonalDetails } from '../application/entities/personal_details.entity';
-import { AcademicDetails } from '../application/entities/academic_details.entity';
 import { ProfileData } from '../application/entities/profile_data';
 import { User } from '../user/entities/user.entity';
 import { Role } from '../auth/role.enum';
@@ -60,8 +59,6 @@ export class RankingService {
     private readonly personalDetailsRepository: Repository<PersonalDetails>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRepository(AcademicDetails)
-    private readonly academicDetailsRepository: Repository<AcademicDetails>,
     @InjectRepository(ProfileData)
     private readonly profileRepository: Repository<ProfileData>,
   ) {}
@@ -329,16 +326,14 @@ export class RankingService {
     if (users.length === 0) return [];
 
     const userIds = users.map((user) => user.id);
-    const [personalDetails, academicDetails, families, educationRecords, profiles] = await Promise.all([
+    const [personalDetails, families, educationRecords, profiles] = await Promise.all([
       this.personalDetailsRepository.find({ where: { userId: In(userIds) } }),
-      this.academicDetailsRepository.find({ where: { userId: In(userIds) } }),
       this.familyRepository.find({ where: { userId: In(userIds) } }),
       this.educationRepository.find({ where: { userId: In(userIds) } }),
       this.profileRepository.find({ where: { userId: In(userIds) } }),
     ]);
 
     const personalMap = new Map(personalDetails.map((row) => [row.userId, row]));
-    const academicMap = new Map(academicDetails.map((row) => [row.userId, row]));
     const familyMap = new Map(families.map((row) => [row.userId, row]));
     const profileMap = new Map(profiles.map((row) => [row.userId, row]));
     const educationMap = new Map<string, Education[]>();
@@ -353,8 +348,7 @@ export class RankingService {
 
     for (const user of users) {
       const personalDetail = personalMap.get(user.id);
-      const academicDetail = academicMap.get(user.id);
-      if (!personalDetail || !academicDetail) continue;
+      if (!personalDetail) continue;
 
       const family = familyMap.get(user.id);
       const educations = educationMap.get(user.id) ?? [];
@@ -469,8 +463,8 @@ export class RankingService {
         lastName: personalDetail.lastName,
         registrationNumber: personalDetail.registrationNumber,
         email: user.email,
-        programOfStudy: academicDetail.programOfStudy,
-        yearOfStudy: academicDetail.yearOfStudy,
+        programOfStudy: academicScore.department ?? 'Programme not available',
+        yearOfStudy: academicScore.yearOfStudy ?? 0,
         totalScore,
         academicScore: academicScore.academicScore,
         familyBackgroundScore: familyScore.currentScore,

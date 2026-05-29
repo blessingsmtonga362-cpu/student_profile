@@ -5,7 +5,6 @@ import { SponsorAllocation } from './entities/sponsor-allocation.entity';
 import { SponsorService } from './sponsor.service';
 import { SponsorController } from './sponsor.controller';
 import { ProfileData } from 'src/application/entities/profile_data';
-import { AcademicDetails } from 'src/application/entities/academic_details.entity';
 import { FileModule } from 'src/file/file.module';
 import { ReviewModule } from 'src/application/modules/review.module';
 import { UserModule } from 'src/user/user.module';
@@ -13,7 +12,7 @@ import { RankingModule } from 'src/ranking/ranking.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Sponsor, SponsorAllocation, ProfileData, AcademicDetails]),
+    TypeOrmModule.forFeature([Sponsor, SponsorAllocation, ProfileData]),
     FileModule,
     forwardRef(() => ReviewModule),
     UserModule,

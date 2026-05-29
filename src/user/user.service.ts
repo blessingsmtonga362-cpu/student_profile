@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -13,12 +14,17 @@ import * as bcrypt from 'bcrypt';
 import { Role } from '../auth/role.enum';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../email/email.service';
+import { PersonalDetails } from 'src/application/entities/personal_details.entity';
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(PersonalDetails)
+    private personalDetailsRepository: Repository<PersonalDetails>,
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
     private readonly emailService: EmailService,
@@ -35,9 +41,10 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
-      ...createUserDto,
+      ...userData,
       password: hashedPassword,
       role: Role.User,
       isEmailVerified: true, // Direct creation - already verified
@@ -59,9 +66,10 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
-      ...createUserDto,
+      ...userData,
       password: hashedPassword,
       role: Role.User,
       otp: otp,
@@ -83,6 +91,7 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
+    const { registrationNumber, ...userData } = createUser;
     
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -94,7 +103,7 @@ export class UserService {
     otpExpiry.setMilliseconds(0);
 
     const user = this.userRepository.create({ 
-      ...createUser, 
+      ...userData, 
       password: hashedPassword,
       role: Role.User,
       otp: otp,
@@ -160,7 +169,6 @@ export class UserService {
         role: user.role === 'admin' ? 'admin' : 'student',
         firstName: user.firstName,
         lastName: user.lastName,
-        registrationNumber: user.registrationNumber,
       },
     };
   }
@@ -245,8 +253,13 @@ export class UserService {
   // ========== FIND USER BY REGISTRATION NUMBER ==========
   async findByRegistrationNumber(registrationNumber: string): Promise<User | null> {
     if (!registrationNumber) return null;
-    return await this.userRepository.findOne({
+    const personalDetails = await this.personalDetailsRepository.findOne({
       where: { registrationNumber },
+    });
+    if (!personalDetails) return null;
+
+    return this.userRepository.findOne({
+      where: { id: personalDetails.userId },
     });
   }
 
@@ -257,7 +270,7 @@ export class UserService {
     });
 
     if (existingAdmin) {
-      console.log('Admin user already exists');
+      this.logger.debug('Admin user already exists');
       return existingAdmin;
     }
 
@@ -272,13 +285,12 @@ export class UserService {
       email: this.configService.get<string>('ADMIN_EMAIL', 'blessings@unima.ac.mw'),
       password: hashedPassword,
       university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
-      registrationNumber: this.configService.get<string>('ADMIN_REGISTRATION_NUMBER', 'ADMIN001'),
       role: Role.Admin,
       isEmailVerified: true,
     });
     
     const savedAdmin = await this.userRepository.save(user);
-    console.log('Admin user created successfully');
+    this.logger.debug('Admin user created successfully');
     return savedAdmin;
   }
 

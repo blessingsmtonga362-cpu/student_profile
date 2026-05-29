@@ -221,16 +221,16 @@ export class EmailService {
 
   // Helper method to log email to console (for development when email is not configured)
   private logEmailToConsole(options: EmailOptions): void {
-    console.log('\n' + '='.repeat(60));
-    console.log(`📧 EMAIL (Development Mode)`);
-    console.log('='.repeat(60));
-    console.log(`To: ${options.to}`);
-    console.log(`Subject: ${options.subject}`);
-    console.log(`Content:`);
-    console.log('-'.repeat(40));
-    console.log(this.stripHtml(options.html));
-    console.log('-'.repeat(40));
-    console.log('='.repeat(60) + '\n');
+    if (this.configService.get<string>('EMAIL_DEBUG', 'false') !== 'true') {
+      this.logger.debug(
+        `Email suppressed because SMTP is not configured: ${options.subject} -> ${options.to}`,
+      );
+      return;
+    }
+
+    this.logger.debug(
+      `Email preview: ${options.subject} -> ${options.to}\n${this.stripHtml(options.html)}`,
+    );
   }
 
   // Helper method to strip HTML tags for plain text version

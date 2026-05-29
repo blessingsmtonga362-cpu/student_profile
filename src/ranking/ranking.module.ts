@@ -10,7 +10,6 @@ import { IntegrityCheckService } from './services/integrity-check.service';
 import { Family } from '../application/entities/family.entity';
 import { Education } from '../application/entities/education.entity';
 import { PersonalDetails } from '../application/entities/personal_details.entity';
-import { AcademicDetails } from '../application/entities/academic_details.entity';
 import { User } from '../user/entities/user.entity';
 import { VerificationLog } from '../application/entities/verification-log.entity';
 import { ProfileData } from '../application/entities/profile_data';
@@ -21,7 +20,6 @@ import { ProfileData } from '../application/entities/profile_data';
       Family,
       Education,
       PersonalDetails,
-      AcademicDetails,
       User,
       VerificationLog,
       ProfileData,

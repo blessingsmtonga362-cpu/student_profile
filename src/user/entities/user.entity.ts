@@ -10,8 +10,7 @@ export class User {
   @Column()
   firstName: string;
 
-  @Column({ unique: true, nullable: true })
-  registrationNumber: string;
+  
 
   @Column()
   lastName: string;

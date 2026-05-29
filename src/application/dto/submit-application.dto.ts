@@ -73,26 +73,6 @@ export class PersonalDetailsDto {
   disability?: string;
 }
 
-export class AcademicDetailsDto {
-  @IsNotEmpty({ message: 'Program of study is required' })
-  @IsString()
-  programOfStudy: string;
-
-  @IsNotEmpty({ message: 'Department is required' })
-  @IsString()
-  department: string;
-
-  @IsNotEmpty({ message: 'Year of study is required' })
-  @IsNumber()
-  @Min(1)
-  @Max(6)
-  yearOfStudy: number;
-
-  @IsOptional()
-  @IsString()
-  transcriptUrl?: string;
-}
-
 export class ParentInfoDto {
   @IsNotEmpty({ message: 'Mother\'s full name is required' })
   @IsString()
@@ -203,11 +183,6 @@ export class SubmitApplicationDto {
   @Type(() => PersonalDetailsDto)
   @IsObject({ message: 'Personal details are required' })
   personal: PersonalDetailsDto;
-
-  @ValidateNested()
-  @Type(() => AcademicDetailsDto)
-  @IsObject({ message: 'Academic details are required' })
-  academic: AcademicDetailsDto;
 
   @ValidateNested()
   @Type(() => FamilyDetailsDto)

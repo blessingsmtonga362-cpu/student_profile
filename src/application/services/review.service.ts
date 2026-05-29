@@ -1,6 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PersonalDetailService } from './personal_details.service';
-import { AcademicDetailService } from './academic_details.service';
 import { FamilyService } from './family.service';
 import { EducationService } from './education.service';
 import { ApplicationSubmissionService } from './application_submission.service';
@@ -9,7 +8,6 @@ import { SubmitApplicationDto } from '../dto/submit-application.dto';
 import { ApplicationStatus } from '../entities/application_submission.entity';
 import { EducationLevel } from '../entities/education.entity';
 import { PersonalDetails } from '../entities/personal_details.entity';
-import { AcademicDetails } from '../entities/academic_details.entity';
 import { Family } from '../entities/family.entity';
 import { Education } from '../entities/education.entity';
 
@@ -18,8 +16,6 @@ export class ReviewService {
   constructor(
     @Inject(forwardRef(() => PersonalDetailService))
     private readonly personalDetailService: PersonalDetailService,
-    @Inject(forwardRef(() => AcademicDetailService))
-    private readonly academicDetailService: AcademicDetailService,
     @Inject(forwardRef(() => FamilyService))
     private readonly familyService: FamilyService,
     @Inject(forwardRef(() => EducationService))
@@ -32,22 +28,18 @@ export class ReviewService {
 
   // ========== GET COMPLETE APPLICATION ==========
   async getCompleteApplication(userId: string) {
-    const [personalDetails, academicDetails, familyDetails, education] = await Promise.all([
+    const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
-      this.academicDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
       this.educationService.findByUserId(userId).catch((): Education[] => []),
     ]);
 
-    const totalSections = 4;
+    const totalSections = 3;
     let completedSections = 0;
     const missingSections: string[] = [];
 
     if (personalDetails) completedSections++;
     else missingSections.push('Personal Details');
-
-    if (academicDetails) completedSections++;
-    else missingSections.push('Academic Details');
 
     if (familyDetails) completedSections++;
     else missingSections.push('Family Details');
@@ -61,7 +53,6 @@ export class ReviewService {
       success: true,
       data: {
         personalDetails,
-        academicDetails,
         familyDetails,
         education: {
           primary: education.filter(e => e.educationLevel === 'primary'),
@@ -96,16 +87,6 @@ export class ReviewService {
       }
     } catch (error) {
       missingSections.push('Personal Details');
-    }
-
-    try {
-      const academic = await this.academicDetailService.findByUserId(userId);
-      const academicMissingFields = this.validateAcademicDetails(academic);
-      if (academicMissingFields.length > 0) {
-        missingFields.push({ section: 'Academic Details', fields: academicMissingFields });
-      }
-    } catch (error) {
-      missingSections.push('Academic Details');
     }
 
     try {
@@ -163,7 +144,6 @@ export class ReviewService {
 
     // 3. Save all data
     await this.savePersonalDetails(userId, applicationData.personal);
-    await this.saveAcademicDetails(userId, applicationData.academic);
     await this.saveFamilyDetails(userId, applicationData.family);
     await this.saveEducationDetails(userId, applicationData.education);
 
@@ -244,16 +224,6 @@ export class ReviewService {
       if (!p.physicalAddress) errors.push('Physical address is required');
     }
 
-    // Academic Details Validation
-    if (!data.academic) {
-      errors.push('Academic details are required');
-    } else {
-      const a = data.academic;
-      if (!a.programOfStudy) errors.push('Program of study is required');
-      if (!a.department) errors.push('Department is required');
-      if (!a.yearOfStudy) errors.push('Year of study is required');
-    }
-
     // Family Details Validation
     if (!data.family) {
       errors.push('Family details are required');
@@ -323,14 +293,6 @@ export class ReviewService {
     return missingFields;
   }
 
-  private validateAcademicDetails(academic: AcademicDetails): string[] {
-    const missingFields: string[] = [];
-    if (!academic.programOfStudy) missingFields.push('Program of Study');
-    if (!academic.department) missingFields.push('Department');
-    if (!academic.yearOfStudy) missingFields.push('Year of Study');
-    return missingFields;
-  }
-
   private validateFamilyDetails(family: Family): string[] {
     const missingFields: string[] = [];
     if (!family.guardianFirstName) missingFields.push('Guardian First Name');
@@ -375,23 +337,6 @@ export class ReviewService {
       await this.personalDetailService.update(existing.id, personalData);
     } else {
       await this.personalDetailService.create(userId, personalData);
-    }
-  }
-
-  private async saveAcademicDetails(userId: string, data: any) {
-    const academicData = {
-      programOfStudy: data.programOfStudy,
-      department: data.department,
-      yearOfStudy: data.yearOfStudy,
-      transcriptUrl: data.transcriptUrl,
-      userId: userId,
-    };
-    
-    const existing = await this.academicDetailService.findByUserId(userId).catch(() => null);
-    if (existing) {
-      await this.academicDetailService.update(existing.id, academicData);
-    } else {
-      await this.academicDetailService.create(userId, academicData);
     }
   }
 
@@ -446,16 +391,6 @@ export class ReviewService {
     return await this.personalDetailService.update(personalDetails.id, updateDto);
   }
 
-  async updateAcademicDetails(userId: string, updateDto: any) {
-    let academicDetails;
-    try {
-      academicDetails = await this.academicDetailService.findByUserId(userId);
-    } catch (error) {
-      return await this.academicDetailService.create(userId, updateDto);
-    }
-    return await this.academicDetailService.update(academicDetails.id, updateDto);
-  }
-
   async updateFamilyDetails(userId: string, updateDto: any) {
     let familyDetails;
     try {
@@ -481,15 +416,6 @@ export class ReviewService {
     return { success: true, message: 'Personal details deleted successfully' };
   }
 
-  async deleteAcademicDetails(academicId: string, userId: string) {
-    const academicDetails = await this.academicDetailService.findOne(academicId);
-    if (academicDetails.userId !== userId) {
-      throw new BadRequestException('You can only delete your own academic details');
-    }
-    await this.academicDetailService.remove(academicId);
-    return { success: true, message: 'Academic details deleted successfully' };
-  }
-
   async deleteFamilyDetails(userId: string) {
     const familyDetails = await this.familyService.findByUserId(userId);
     await this.familyService.remove(familyDetails.id);
@@ -513,7 +439,6 @@ export class ReviewService {
     return {
       summary: {
         hasPersonalDetails: !!application.data.personalDetails,
-        hasAcademicDetails: !!application.data.academicDetails,
         hasFamilyDetails: !!application.data.familyDetails,
         hasEducation: application.data.education.primary.length > 0 || 
                       application.data.education.secondary.length > 0 || 
@@ -536,8 +461,6 @@ export class ReviewService {
     switch (section) {
       case 'personal':
         return await this.personalDetailService.findByUserId(userId);
-      case 'academic':
-        return await this.academicDetailService.findByUserId(userId);
       case 'family':
         return await this.familyService.findByUserId(userId);
       case 'education':
@@ -550,7 +473,6 @@ export class ReviewService {
   // ========== BULK UPDATE ==========
   async bulkUpdate(userId: string, updateData: {
     personal?: any;
-    academic?: any;
     family?: any;
     education?: any[];
   }) {
@@ -558,10 +480,6 @@ export class ReviewService {
     
     if (updateData.personal) {
       results.personal = await this.updatePersonalDetails(userId, updateData.personal);
-    }
-    
-    if (updateData.academic) {
-      results.academic = await this.updateAcademicDetails(userId, updateData.academic);
     }
     
     if (updateData.family) {

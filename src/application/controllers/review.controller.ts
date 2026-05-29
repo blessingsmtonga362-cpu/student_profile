@@ -13,11 +13,9 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { PersonalDetailService } from '../services/personal_details.service';
-import { AcademicDetailService } from '../services/academic_details.service';
 import { FamilyService } from '../services/family.service';
 import { EducationService } from '../services/education.service';
 import { UpdatePersonalDetailDto } from '../dto/create_personal_details.dto';
-import { UpdateAcademicDetailDto } from '../dto/create_academic_details.dto';
 import { UpdateFamilyDto } from '../dto/create_family.dto';
 import { UpdateEducationDto } from '../dto/education/update-education.dto';
 import { UserService } from '../../user/user.service'; 
@@ -30,7 +28,6 @@ import { ApplicationSubmissionService } from '../services/application_submission
 export class ReviewController {
   constructor(
     private readonly personalDetailService: PersonalDetailService,
-    private readonly academicDetailService: AcademicDetailService,
     private readonly familyService: FamilyService,
     private readonly educationService: EducationService,
     private readonly userService: UserService,
@@ -133,44 +130,6 @@ export class ReviewController {
     }
   }
 
-  private hasAnyAcademicValue(academicData: any): boolean {
-    if (!academicData || typeof academicData !== 'object') return false;
-
-    return [
-      academicData.programOfStudy,
-      academicData.department,
-      academicData.yearOfStudy,
-    ].some((value) => this.toOptionalString(value) !== undefined || this.toOptionalNumber(value) !== undefined);
-  }
-
-  private validateAcademicSection(academicData: any) {
-    if (!this.hasAnyAcademicValue(academicData)) {
-      throw new BadRequestException(
-        'Academic details are required. Please provide program of study, department, and year of study.',
-      );
-    }
-
-    const missingFields: string[] = [];
-
-    if (!this.toOptionalString(academicData?.programOfStudy)) {
-      missingFields.push('program of study');
-    }
-
-    if (!this.toOptionalString(academicData?.department)) {
-      missingFields.push('department');
-    }
-
-    if (this.toOptionalNumber(academicData?.yearOfStudy) === undefined) {
-      missingFields.push('year of study');
-    }
-
-    if (missingFields.length > 0) {
-      throw new BadRequestException(
-        `Academic details are incomplete. Please provide ${missingFields.join(', ')}.`,
-      );
-    }
-  }
-
   private normalizePersonalPayload(applicationData: any) {
     const personal = applicationData.personal ?? {};
     const payment = applicationData.payment ?? {};
@@ -260,9 +219,8 @@ export class ReviewController {
   async getMyCompleteApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
     
-    const [personalDetails, academicDetails, familyDetails, education] = await Promise.all([
+    const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
-      this.academicDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
       this.educationService.findByUserId(userId).catch((): Education[] => []),
     ]);
@@ -271,7 +229,6 @@ export class ReviewController {
       success: true,
       data: {
         personalDetails,
-        academicDetails,
         familyDetails,
         education: {
           primary: education.filter(e => e.educationLevel === 'primary'),
@@ -311,6 +268,7 @@ export class ReviewController {
     };
   }
 
+<<<<<<< HEAD
   // ========== ACADEMIC DETAILS ==========
   @Get('academic-details')
   async getAcademicDetails(@Req() req) {
@@ -356,6 +314,9 @@ export class ReviewController {
   }
 
   // ========== FAMILY DETAILS ==========
+=======
+  //Kuonga maditelu a abanja lakwanu
+>>>>>>> 513662868beea244377ed274fc950a3f6a327fca
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -454,8 +415,12 @@ export class ReviewController {
     const userId = await this.getUserIdFromRequest(req);
 
     try {
+<<<<<<< HEAD
       // VALIDATE all sections are complete before allowing final submission
       this.validateAcademicSection(applicationData.academics);
+=======
+      // VALIDATES all sections are complete before allowing final submission
+>>>>>>> 513662868beea244377ed274fc950a3f6a327fca
       this.validateEducationSection('Primary', applicationData.education?.primary);
       this.validateEducationSection('Secondary', applicationData.education?.secondary);
       this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
@@ -472,6 +437,7 @@ export class ReviewController {
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
       
+<<<<<<< HEAD
       // SAVE academic details
       const academicData = {
         programOfStudy: this.toOptionalString(applicationData.academics.programOfStudy) ?? '',
@@ -481,6 +447,8 @@ export class ReviewController {
       await this.academicDetailService.upsertByUserId(userId, academicData as any);
       
       // SAVE primary education
+=======
+>>>>>>> 513662868beea244377ed274fc950a3f6a327fca
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -528,4 +496,40 @@ export class ReviewController {
       });
     }
   }
+<<<<<<< HEAD
 }
+=======
+
+  // SUBMIT FOR FINAL REVIEW (Legacy - kept for compatibility) 
+  @Post('submit')
+  async submitApplication(@Req() req) {
+    const userId = await this.getUserIdFromRequest(req);
+    
+    const [personalDetails, familyDetails, education] = await Promise.all([
+      this.personalDetailService.findByUserId(userId).catch(() => null),
+      this.familyService.findByUserId(userId).catch(() => null),
+      this.educationService.findByUserId(userId).catch(() => []),
+    ]);
+
+    const missingSections: string[] = [];
+    if (!personalDetails) missingSections.push('Personal Details');
+    if (!familyDetails) missingSections.push('Family Details');
+    if (education.length === 0) missingSections.push('Education Information');
+
+    if (missingSections.length > 0) {
+      throw new BadRequestException({
+        message: 'Cannot submit application. Missing required sections.',
+        missingSections,
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Application submitted successfully for final review',
+      submittedAt: new Date(),
+      applicationStatus: 'pending_review',
+    };
+  }
+  
+}
+>>>>>>> 513662868beea244377ed274fc950a3f6a327fca
