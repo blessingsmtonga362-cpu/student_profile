@@ -267,7 +267,11 @@ export class ReviewController {
     };
   }
 
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> e937aaf2f6828070c9e472430fb95a13f3df2788
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -367,6 +371,10 @@ export class ReviewController {
 
     try {
       // VALIDATES all sections are complete before allowing final submission
+<<<<<<< HEAD
+=======
+
+>>>>>>> e937aaf2f6828070c9e472430fb95a13f3df2788
       this.validateEducationSection('Primary', applicationData.education?.primary);
       this.validateEducationSection('Secondary', applicationData.education?.secondary);
       this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
@@ -382,6 +390,11 @@ export class ReviewController {
         const familyData = this.normalizeFamilyPayload(applicationData.family);
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
+<<<<<<< HEAD
+=======
+      
+
+>>>>>>> e937aaf2f6828070c9e472430fb95a13f3df2788
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
