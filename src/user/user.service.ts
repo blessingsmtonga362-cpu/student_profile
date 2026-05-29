@@ -41,6 +41,7 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
       ...createUserDto,
@@ -66,6 +67,7 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+    const { registrationNumber, ...userData } = createUserDto;
     
     const user = this.userRepository.create({
       ...createUserDto,
@@ -91,6 +93,7 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
+    const { registrationNumber, ...userData } = createUser;
     
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();

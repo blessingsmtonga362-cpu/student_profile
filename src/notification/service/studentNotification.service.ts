@@ -71,14 +71,14 @@ export class StudentNotificationService {
     
     // Otherwise generate based on type
     const subjects: Record<NotificationType, string> = {
-      [NotificationType.APPLICATION_SUBMITTED]: '✅ Application Submitted Successfully',
-      [NotificationType.APPLICATION_APPROVED]: '🎉 Congratulations! Application Approved',
-      [NotificationType.APPLICATION_REJECTED]: '📢 Application Status Update',
-      [NotificationType.STUDENT_SELECTED]: '🎊 You Have Been Selected!',
-      [NotificationType.MONEY_DISBURSED]: '💰 Payment Disbursed',
-      [NotificationType.MONEY_RECEIVED]: '✅ Payment Received',
-      [NotificationType.PAYMENT_REMINDER]: '⏰ Payment Reminder',
-      [NotificationType.SYSTEM]: '📢 System Notification',
+      [NotificationType.APPLICATION_SUBMITTED]: 'Application Submitted Successfully',
+      [NotificationType.APPLICATION_APPROVED]: 'Congratulations! Application Approved',
+      [NotificationType.APPLICATION_REJECTED]: 'Application Status Update',
+      [NotificationType.STUDENT_SELECTED]: 'You Have Been Selected!',
+      [NotificationType.MONEY_DISBURSED]: 'Payment Disbursed',
+      [NotificationType.MONEY_RECEIVED]: 'Payment Received',
+      [NotificationType.PAYMENT_REMINDER]: 'Payment Reminder',
+      [NotificationType.SYSTEM]: 'System Notification',
     };
     return subjects[type] || 'Mthandizi Notification';
   }
