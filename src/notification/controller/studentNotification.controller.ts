@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Query, UseGuards, Req, Patch } from '@nestjs/common';
+import { Controller, Get, Delete, Param, Query, UseGuards, Req, Patch } from '@nestjs/common';
 import { StudentNotificationService } from '../service/studentNotification.service';
 import { AuthGuard } from '../../auth/auth.guard';
 import { NotificationQueryDto } from '../dto/studentNotification.dto';
@@ -60,6 +60,7 @@ export class StudentNotificationController {
     };
   }
 
+<<<<<<< HEAD
  
  @Patch('read-all')
   async markAllAsReadPatch(@Req() req) {
@@ -75,6 +76,10 @@ export class StudentNotificationController {
 
   // Keep your existing POST endpoint for backward compatibility
   @Post('mark-all-read')
+=======
+  // Mark all notifications as have been read
+  @Patch('read-all')
+>>>>>>> 99928fe ( application and notification resolving errors)
   async markAllAsRead(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.markAllAsRead(userId);
