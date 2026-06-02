@@ -11,7 +11,7 @@ export interface EmailOptions {
 
 @Injectable()
 export class EmailService {
-  private transporter;
+  private transporter: nodemailer.Transporter | null = null;
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private configService: ConfigService) {
@@ -66,13 +66,14 @@ export class EmailService {
 
   // Send OTP verification email
   async sendOtpEmail(to: string, name: string, otp: string) {
+    const safeName = this.escapeHtml(name);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
           <h2 style="color: white; margin: 0;">Mthandizi Student Portal</h2>
         </div>
         <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
-          <h2>Welcome, ${name}!</h2>
+          <h2>Welcome, ${safeName}!</h2>
           <p>Use the following verification code to complete your registration:</p>
           <div style="text-align: center; margin: 30px 0;">
             <div style="font-size: 32px; font-weight: bold; letter-spacing: 10px; background: #f3f4f6; padding: 15px; border-radius: 10px;">
@@ -91,6 +92,7 @@ export class EmailService {
 
   // Send application submission confirmation to student
   async sendApplicationSubmittedEmail(to: string, studentName: string, applicationReference: string): Promise<void> {
+    const safeStudentName = this.escapeHtml(studentName);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
@@ -103,7 +105,7 @@ export class EmailService {
             </div>
           </div>
           <h2 style="color: #1e3a5f; text-align: center;">Application Submitted Successfully!</h2>
-          <p>Dear <strong>${studentName}</strong>,</p>
+          <p>Dear <strong>${safeStudentName}</strong>,</p>
           <p>Your application has been successfully submitted to Mthandizi Student Support Portal.</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 0;"><strong>Application Reference:</strong> ${applicationReference}</p>
@@ -126,6 +128,8 @@ export class EmailService {
 
   // Send notification to admin about new application
   async sendNewApplicationAlertToAdmin(to: string, adminName: string, studentName: string, applicationReference: string): Promise<void> {
+    const safeAdminName = this.escapeHtml(adminName);
+    const safeStudentName = this.escapeHtml(studentName);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
@@ -138,10 +142,10 @@ export class EmailService {
             </div>
           </div>
           <h2 style="color: #1e3a5f; text-align: center;">New Application Submitted</h2>
-          <p>Dear <strong>${adminName}</strong>,</p>
+          <p>Dear <strong>${safeAdminName}</strong>,</p>
           <p>A new application has been submitted and requires your review.</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 0;"><strong>Student Name:</strong> ${studentName}</p>
+            <p style="margin: 0;"><strong>Student Name:</strong> ${safeStudentName}</p>
             <p style="margin: 10px 0 0;"><strong>Application Reference:</strong> ${applicationReference}</p>
             <p style="margin: 10px 0 0;"><strong>Submission Date:</strong> ${new Date().toLocaleString()}</p>
           </div>
@@ -185,6 +189,13 @@ export class EmailService {
       under_review: 'Your application is currently under review by our team.',
       submitted: 'Your application has been received and is pending review.',
     };
+    const safeStudentName = this.escapeHtml(studentName);
+    const safeStatus = this.escapeHtml(status);
+    const safeStatusLabel = this.escapeHtml(status.toUpperCase());
+    const safeComments = comments ? this.escapeHtml(comments) : '';
+    const statusMessage =
+      statusMessages[status] ||
+      `Your application status has been updated to ${safeStatus}.`;
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -197,13 +208,13 @@ export class EmailService {
               <span style="color: white; font-size: 30px;">${status === 'approved' ? '✓' : status === 'rejected' ? '✗' : '⏳'}</span>
             </div>
           </div>
-          <h2 style="color: #1e3a5f; text-align: center;">Application ${status.toUpperCase()}</h2>
-          <p>Dear <strong>${studentName}</strong>,</p>
-          <p>${statusMessages[status] || `Your application status has been updated to ${status}.`}</p>
+          <h2 style="color: #1e3a5f; text-align: center;">Application ${safeStatusLabel}</h2>
+          <p>Dear <strong>${safeStudentName}</strong>,</p>
+          <p>${statusMessage}</p>
           <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 0;"><strong>Application Reference:</strong> ${applicationReference}</p>
-            <p style="margin: 10px 0 0;"><strong>Status:</strong> ${status.toUpperCase()}</p>
-            ${comments ? `<p style="margin: 10px 0 0;"><strong>Comments:</strong> ${comments}</p>` : ''}
+            <p style="margin: 10px 0 0;"><strong>Status:</strong> ${safeStatusLabel}</p>
+            ${comments ? `<p style="margin: 10px 0 0;"><strong>Comments:</strong> ${safeComments}</p>` : ''}
           </div>
           <p>Log in to your dashboard for more details.</p>
           <hr style="margin: 20px 0;">
@@ -236,5 +247,19 @@ export class EmailService {
   // Helper method to strip HTML tags for plain text version
   private stripHtml(html: string): string {
     return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  private escapeHtml(value: string): string {
+    return value.replace(
+      /[&<>"']/g,
+      (character) =>
+        ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;',
+        })[character] as string,
+    );
   }
 }

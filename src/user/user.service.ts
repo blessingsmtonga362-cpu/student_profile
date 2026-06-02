@@ -4,6 +4,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -15,6 +16,7 @@ import { Role } from '../auth/role.enum';
 import { JwtService } from '@nestjs/jwt';
 import { EmailService } from '../email/email.service';
 import { PersonalDetails } from 'src/application/entities/personal_details.entity';
+import { randomInt } from 'crypto';
 
 @Injectable()
 export class UserService {
@@ -41,7 +43,6 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const { registrationNumber, ...userData } = createUserDto;
 
     const user = this.userRepository.create({
       ...createUserDto,
@@ -71,7 +72,6 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
-    const { registrationNumber, ...userData } = createUserDto;
 
     const user = this.userRepository.create({
       ...createUserDto,
@@ -99,10 +99,9 @@ export class UserService {
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
-    const { registrationNumber, ...userData } = createUser;
 
     // Generate 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = this.generateOtp();
 
     // Set expiry to EXACTLY 10 minutes from now
     const otpExpiry = new Date();
@@ -122,12 +121,23 @@ export class UserService {
 
     await this.userRepository.save(user);
 
-    // Send OTP email
-    await this.emailService.sendOtpEmail(
-      user.email,
-      user.firstName || 'User',
-      otp,
-    );
+    // The user is saved before email delivery so resendOtp() can recover from
+    // temporary SMTP failures without deleting a legitimate registration.
+    try {
+      await this.emailService.sendOtpEmail(
+        user.email,
+        user.firstName || 'User',
+        otp,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send registration OTP email to ${user.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new ServiceUnavailableException(
+        'Registration was saved, but the verification email could not be sent. Please request a new verification code.',
+      );
+    }
 
     return {
       message:
@@ -173,8 +183,8 @@ export class UserService {
 
     // Mark email as verified and clear OTP
     user.isEmailVerified = true;
-    user.otp = null as any;
-    user.otpExpiry = null as any;
+    user.otp = null;
+    user.otpExpiry = null;
     await this.userRepository.save(user);
 
     // Generate JWT token
@@ -203,8 +213,8 @@ export class UserService {
   async verifyEmail(userId: string): Promise<void> {
     await this.userRepository.update(userId, {
       isEmailVerified: true,
-      otp: null as any,
-      otpExpiry: null as any,
+      otp: null,
+      otpExpiry: null,
     });
   }
 
@@ -221,7 +231,7 @@ export class UserService {
     }
 
     // Generate new OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otp = this.generateOtp();
 
     // Reset expiry to 10 minutes from now
     const otpExpiry = new Date();
@@ -252,6 +262,10 @@ export class UserService {
       otp: otp,
       otpExpiry: otpExpiry,
     });
+  }
+
+  private generateOtp(): string {
+    return randomInt(100000, 1000000).toString();
   }
 
   // ========== FIND USER BY EMAIL ==========

@@ -1,5 +1,11 @@
 // src/user/entities/user.entity.ts
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { Role } from '../../auth/role.enum';
 
 @Entity('user')
@@ -9,8 +15,6 @@ export class User {
 
   @Column()
   firstName: string;
-
-  
 
   @Column()
   lastName: string;
@@ -24,17 +28,18 @@ export class User {
   @Column()
   university: string;
 
-  @Column({ 
-    type: 'enum', 
-    enum: Role, 
-    default: Role.User 
+  @Column({
+    type: 'enum',
+    enum: Role,
+    default: Role.User,
   })
   role: Role;
-@Column({ nullable: true })
-otp: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  otp: string | null;
 
   @Column({ nullable: true, type: 'timestamp' })
-  otpExpiry: Date;
+  otpExpiry: Date | null;
 
   @Column({ default: false })
   isEmailVerified: boolean;
