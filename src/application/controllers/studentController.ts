@@ -10,13 +10,6 @@ export class StudentController {
     private readonly submissionService: ApplicationSubmissionService,
     private readonly userService: UserService,
   ) {}
-
-  /**
-   * GET /student/application/status
-   * Returns the current submission status for the logged-in student.
-   * This is the primary endpoint the frontend uses to determine whether
-   * to show the wizard, the congratulations screen, or the status tracker.
-   */
   @Get('application/status')
   async getApplicationStatus(@Req() req) {
     const user = await this.userService.findOne(req.user?.email);

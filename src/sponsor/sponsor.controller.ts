@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from 'src/auth/role.decorator';
 import { Role } from 'src/auth/role.enum';
@@ -19,6 +19,12 @@ export class SponsorController {
   @Get(':id')
   getSponsor(@Param('id') id: string) {
     return this.sponsorService.getSponsorById(id);
+  }
+
+  @Roles(Role.Admin)
+  @Delete(':id')
+  deleteSponsor(@Param('id') id: string) {
+    return this.sponsorService.deleteSponsor(id);
   }
 
   @Roles(Role.Admin)

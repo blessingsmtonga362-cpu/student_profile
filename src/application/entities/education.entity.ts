@@ -67,7 +67,6 @@ export class Education {
   @Column({ name: 'description', nullable: true, type: 'text' })
   description?: string;
 
-  // Status fields
   @Column({ default: false, name: 'is_verified' })
   isVerified: boolean;
 
@@ -76,9 +75,4 @@ export class Education {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  // Relationships
-  //@ManyToOne(() => User, (user) => user.education)
-  //@JoinColumn({ name: 'user_id' })
-  //user: User;
 }

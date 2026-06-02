@@ -17,6 +17,12 @@ export class Sponsor {
   @Column({ name: 'requested_slots', type: 'integer' })
   requestedSlots: number;
 
+  @Column({ name: 'ranking_criteria_id', type: 'uuid', nullable: true })
+  rankingCriteriaId?: string | null;
+
+  @Column({ name: 'is_criteria_activated', default: false })
+  isCriteriaActivated: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

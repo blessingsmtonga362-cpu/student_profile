@@ -34,7 +34,6 @@ export class PersonalDetails {
   @Column({ name: 'user_id' })
   userId: string;
 
-  // Basic Information
   @Column({ name: 'first_name', nullable: false, length: 15 })
   firstName: string;
 
@@ -203,9 +202,4 @@ export class PersonalDetails {
     this.validatePhoneNumber(this.phoneNumber, 'Phone number');
     this.validatePaymentPhone();
   }
-
-  // Relationships
-  // @OneToOne(() => User, (user) => user.personalDetails)
-  // @JoinColumn({ name: 'user_id' })
-  // user: User;
 }
