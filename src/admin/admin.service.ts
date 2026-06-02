@@ -6,12 +6,14 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ApplicationStatus } from 'src/application/entities/application_submission.entity';
+import { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  ApplicationStatus,
+  ApplicationSubmission,
+} from 'src/application/entities/application_submission.entity';
 import { PersonalDetails } from 'src/application/entities/personal_details.entity';
 import { ProfileData } from 'src/application/entities/profile_data';
 import { VerificationLog } from 'src/application/entities/verification-log.entity';
-import { ApplicationSubmissionService } from 'src/application/services/application_submission.service';
 import { ReviewService } from 'src/application/services/review.service';
 import {
   NotificationPriority,
@@ -21,10 +23,12 @@ import {
 import { StudentNotificationService } from 'src/notification/service/studentNotification.service';
 import { RankingService } from 'src/ranking/ranking.service';
 import { UserService } from 'src/user/user.service';
-import {
-  AdminApplicationReviewStatus,
-  CreateAdminDto,
-} from './dto/create-admin.dto';
+import { CreateAdminDto } from './dto/create-admin.dto';
+import { ProfileReviewStatus } from './enums/profile-review-status.enum';
+
+type ReviewActionStatus =
+  | ProfileReviewStatus.APPROVED
+  | ProfileReviewStatus.FLAGGED;
 
 @Injectable()
 export class AdminService {
@@ -38,21 +42,20 @@ export class AdminService {
     private readonly notificationService: StudentNotificationService,
     private readonly userService: UserService,
     private readonly rankingService: RankingService,
-    @Inject(forwardRef(() => ApplicationSubmissionService))
-    private readonly submissionService: ApplicationSubmissionService,
+    private readonly dataSource: DataSource,
   ) {}
 
-  private normalizeProfileStatus(status?: string | null): string {
+  private normalizeProfileStatus(status?: string | null): ProfileReviewStatus {
     switch ((status ?? '').trim().toLowerCase()) {
-      case AdminApplicationReviewStatus.APPROVED:
-        return AdminApplicationReviewStatus.APPROVED;
-      case AdminApplicationReviewStatus.FLAGGED:
-        return AdminApplicationReviewStatus.FLAGGED;
-      case 'pending_review':
+      case ProfileReviewStatus.APPROVED:
+        return ProfileReviewStatus.APPROVED;
+      case ProfileReviewStatus.FLAGGED:
+        return ProfileReviewStatus.FLAGGED;
+      case ProfileReviewStatus.PENDING_REVIEW:
       case 'pending':
-        return 'pending_review';
+        return ProfileReviewStatus.PENDING_REVIEW;
       default:
-        return 'pending_review';
+        return ProfileReviewStatus.PENDING_REVIEW;
     }
   }
 
@@ -60,8 +63,12 @@ export class AdminService {
     await this.rankingService.refreshAllRankings().catch(() => null);
   }
 
-  private async getOrCreateProfile(userId: string) {
-    const existingProfile = await this.profileRepo.findOne({
+  private async getOrCreateProfile(
+    userId: string,
+    manager?: EntityManager,
+  ): Promise<ProfileData> {
+    const profileRepo = manager?.getRepository(ProfileData) ?? this.profileRepo;
+    const existingProfile = await profileRepo.findOne({
       where: { userId },
     });
 
@@ -74,15 +81,15 @@ export class AdminService {
       throw new NotFoundException('Applicant not found');
     }
 
-    const profile = this.profileRepo.create({
+    const profile = profileRepo.create({
       userId,
       firstName: user.firstName ?? '',
       lastName: user.lastName ?? '',
       registrationNumber: '',
-      status: 'pending_review',
+      status: ProfileReviewStatus.PENDING_REVIEW,
     });
 
-    return this.profileRepo.save(profile);
+    return profileRepo.save(profile);
   }
 
   async syncProfile(personal: PersonalDetails) {
@@ -134,19 +141,20 @@ export class AdminService {
     const approvedSupport = profiles.filter(
       (profile) =>
         this.normalizeProfileStatus(profile.status) ===
-        AdminApplicationReviewStatus.APPROVED,
+        ProfileReviewStatus.APPROVED,
     ).length;
 
     const flaggedFiles = profiles.filter(
       (profile) =>
         this.normalizeProfileStatus(profile.status) ===
-        AdminApplicationReviewStatus.FLAGGED,
+        ProfileReviewStatus.FLAGGED,
     ).length;
 
     const queueProfiles = profiles
       .filter(
         (profile) =>
-          this.normalizeProfileStatus(profile.status) === 'pending_review',
+          this.normalizeProfileStatus(profile.status) ===
+          ProfileReviewStatus.PENDING_REVIEW,
       )
       .slice(0, 10);
 
@@ -185,7 +193,7 @@ export class AdminService {
     };
   }
 
-  async getApplicationsByStatus(status: 'approved' | 'flagged') {
+  async getApplicationsByStatus(status: ReviewActionStatus) {
     await this.refreshRankings();
 
     const profiles = await this.profileRepo.find({
@@ -196,27 +204,31 @@ export class AdminService {
       (profile) => this.normalizeProfileStatus(profile.status) === status,
     );
 
-    const applicants = await Promise.all(
-      filteredProfiles.map(async (profile) => {
-        const user = await this.userService.findById(profile.userId);
-
-        return {
-          userId: profile.userId,
-          firstName: profile.firstName,
-          lastName: profile.lastName,
-          email: user?.email ?? '',
-          registrationNumber: profile.registrationNumber,
-          status: this.normalizeProfileStatus(profile.status),
-          reviewComments: profile.reviewComments ?? null,
-          program: 'Programme not submitted',
-          department: null,
-          yearOfStudy: null,
-          score: profile.score ?? 0,
-          rank: profile.rank ?? null,
-          overallPercentage: profile.overallPercentage ?? 0,
-        };
-      }),
+    // Fetch applicants in one query and map locally to avoid an N+1 lookup.
+    const users = await this.userService.findByIds(
+      filteredProfiles.map((profile) => profile.userId),
     );
+    const userById = new Map(users.map((user) => [user.id, user]));
+
+    const applicants = filteredProfiles.map((profile) => {
+      const user = userById.get(profile.userId);
+
+      return {
+        userId: profile.userId,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: user?.email ?? '',
+        registrationNumber: profile.registrationNumber,
+        status: this.normalizeProfileStatus(profile.status),
+        reviewComments: profile.reviewComments ?? null,
+        program: 'Programme not submitted',
+        department: null,
+        yearOfStudy: null,
+        score: profile.score ?? 0,
+        rank: profile.rank ?? null,
+        overallPercentage: profile.overallPercentage ?? 0,
+      };
+    });
 
     return {
       status,
@@ -262,7 +274,8 @@ export class AdminService {
         familyDetails: application.data.familyDetails
           ? {
               ...application.data.familyDetails,
-              consentFormUrl: (application.data.familyDetails as any).consentFormUrl ?? null,
+              consentFormUrl:
+                (application.data.familyDetails as any).consentFormUrl ?? null,
             }
           : null,
       },
@@ -308,37 +321,57 @@ export class AdminService {
     const normalizedStatus = this.normalizeProfileStatus(createAdminDto.status);
 
     if (
-      normalizedStatus !== AdminApplicationReviewStatus.APPROVED &&
-      normalizedStatus !== AdminApplicationReviewStatus.FLAGGED
+      normalizedStatus !== ProfileReviewStatus.APPROVED &&
+      normalizedStatus !== ProfileReviewStatus.FLAGGED
     ) {
       throw new BadRequestException('Unsupported review status');
     }
 
-    const [profile, user] = await Promise.all([
-      this.getOrCreateProfile(userId),
-      this.userService.findById(userId),
-    ]);
-
+    const user = await this.userService.findById(userId);
     if (!user) {
       throw new NotFoundException('Applicant not found');
     }
 
     const reviewComment = createAdminDto.reviewComments?.trim() || null;
-    if (
-      normalizedStatus === AdminApplicationReviewStatus.FLAGGED &&
-      !reviewComment
-    ) {
+    if (normalizedStatus === ProfileReviewStatus.FLAGGED && !reviewComment) {
       throw new BadRequestException(
         'A review comment is required when flagging an application',
       );
     }
 
-    profile.status = normalizedStatus;
-    profile.reviewComments = reviewComment ?? '';
+    const profile = await this.dataSource.transaction(async (manager) => {
+      const transactionalProfile = await this.getOrCreateProfile(
+        userId,
+        manager,
+      );
 
-    await this.profileRepo.save(profile);
-    await this.updateSubmissionStatus(
-    await this.notifyStudent(userId, normalizedStatus, reviewComment, adminId);
+      transactionalProfile.status = normalizedStatus;
+      transactionalProfile.reviewComments = reviewComment ?? '';
+
+      const savedProfile = await manager
+        .getRepository(ProfileData)
+        .save(transactionalProfile);
+
+      // Keep all review-related database writes atomic. Notifications are
+      // intentionally sent after this transaction commits.
+      await this.updateSubmissionReviewStatus(
+        manager,
+        userId,
+        normalizedStatus,
+        reviewComment,
+        adminId,
+      );
+
+      return savedProfile;
+    });
+
+    await this.sendReviewNotifications(
+      userId,
+      normalizedStatus,
+      reviewComment,
+      adminId,
+    );
+
     return {
       message: 'Application reviewed successfully',
       applicant: {
@@ -352,32 +385,47 @@ export class AdminService {
     };
   }
 
-  // Combined method to handle both submission update and notification
-  private async updateSubmissionAndNotify(
+  private async updateSubmissionReviewStatus(
+    manager: EntityManager,
     userId: string,
-    normalizedStatus: string,
+    normalizedStatus: ReviewActionStatus,
     reviewComment: string | null,
     adminId: string,
   ) {
     const submissionStatus =
-      normalizedStatus === AdminApplicationReviewStatus.APPROVED
+      normalizedStatus === ProfileReviewStatus.APPROVED
         ? ApplicationStatus.APPROVED
         : ApplicationStatus.REJECTED;
 
-    try {
-      await this.submissionService.updateStatus(
-        userId,
-        submissionStatus,
-        reviewComment ?? undefined,
-        adminId,
-      );
-    } catch (error) {
-      if (!(error instanceof NotFoundException)) {
-        throw error;
-      }
+    const submissionRepo = manager.getRepository(ApplicationSubmission);
+    const submission = await submissionRepo.findOne({
+      where: { userId },
+    });
+
+    if (!submission) {
+      return null;
     }
 
-    if (normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
+    submission.status = submissionStatus;
+
+    if (reviewComment !== null) {
+      submission.reviewComments = reviewComment;
+    }
+
+    if (adminId) {
+      submission.adminId = adminId;
+    }
+
+    return submissionRepo.save(submission);
+  }
+
+  private async sendReviewNotifications(
+    userId: string,
+    normalizedStatus: ReviewActionStatus,
+    reviewComment: string | null,
+    adminId: string,
+  ) {
+    if (normalizedStatus === ProfileReviewStatus.APPROVED) {
       // Notify the student
       await this.notificationService.createNotification({
         userId,
@@ -427,4 +475,3 @@ export class AdminService {
     });
   }
 }
-

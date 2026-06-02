@@ -1,4 +1,14 @@
-import { Controller, Get, Delete, Param, Query, UseGuards, Req, Patch } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Delete,
+  Param,
+  Query,
+  UseGuards,
+  Req,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { StudentNotificationService } from '../service/studentNotification.service';
 import { AuthGuard } from '../../auth/auth.guard';
 import { NotificationQueryDto } from '../dto/studentNotification.dto';
@@ -6,13 +16,18 @@ import { NotificationQueryDto } from '../dto/studentNotification.dto';
 @Controller('notifications')
 @UseGuards(AuthGuard)
 export class StudentNotificationController {
-  constructor(private readonly notificationService: StudentNotificationService) {}
+  constructor(
+    private readonly notificationService: StudentNotificationService,
+  ) {}
 
   // Get all notifications for the logged-in user
   @Get()
   async getMyNotifications(@Req() req, @Query() query: NotificationQueryDto) {
     const userId = req.user.id;
-    const result = await this.notificationService.getUserNotifications(userId, query);
+    const result = await this.notificationService.getUserNotifications(
+      userId,
+      query,
+    );
 
     return {
       success: true,
@@ -38,7 +53,9 @@ export class StudentNotificationController {
   @Get('unread')
   async getUnreadNotifications(@Req() req) {
     const userId = req.user.id;
-    const result = await this.notificationService.getUserNotifications(userId, { isRead: false });
+    const result = await this.notificationService.getUserNotifications(userId, {
+      isRead: false,
+    });
 
     return {
       success: true,
@@ -49,9 +66,15 @@ export class StudentNotificationController {
 
   // mark single notification as it has been red
   @Patch(':notificationId/read')
-  async markAsRead(@Param('notificationId') notificationId: string, @Req() req) {
+  async markAsRead(
+    @Param('notificationId') notificationId: string,
+    @Req() req,
+  ) {
     const userId = req.user.id;
-    const notification = await this.notificationService.markAsRead(notificationId, userId);
+    const notification = await this.notificationService.markAsRead(
+      notificationId,
+      userId,
+    );
 
     return {
       success: true,
@@ -60,12 +83,11 @@ export class StudentNotificationController {
     };
   }
 
- 
- @Patch('read-all')
+  @Patch('read-all')
   async markAllAsReadPatch(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.markAllAsRead(userId);
-    
+
     return {
       success: true,
       message: `${result.count} notifications marked as read`,
@@ -91,7 +113,10 @@ export class StudentNotificationController {
 
   // Delete a single notification
   @Delete(':notificationId')
-  async deleteNotification(@Param('notificationId') notificationId: string, @Req() req) {
+  async deleteNotification(
+    @Param('notificationId') notificationId: string,
+    @Req() req,
+  ) {
     const userId = req.user.id;
     await this.notificationService.deleteNotification(notificationId, userId);
 
@@ -105,8 +130,9 @@ export class StudentNotificationController {
   @Delete('clear-all')
   async clearAllNotifications(@Req() req) {
     const userId = req.user.id;
-    const result = await this.notificationService.deleteAllNotifications(userId);
-    
+    const result =
+      await this.notificationService.deleteAllNotifications(userId);
+
     return {
       success: true,
       message: 'All notifications cleared',
@@ -116,9 +142,15 @@ export class StudentNotificationController {
 
   // Get a single notification by ID
   @Get(':notificationId')
-  async getNotificationById(@Param('notificationId') notificationId: string, @Req() req) {
+  async getNotificationById(
+    @Param('notificationId') notificationId: string,
+    @Req() req,
+  ) {
     const userId = req.user.id;
-    const notification = await this.notificationService.getNotificationById(notificationId, userId);
+    const notification = await this.notificationService.getNotificationById(
+      notificationId,
+      userId,
+    );
 
     return {
       success: true,
