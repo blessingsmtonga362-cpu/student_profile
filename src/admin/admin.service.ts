@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   forwardRef,
 } from '@nestjs/common';
@@ -32,6 +33,8 @@ type ReviewActionStatus =
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     @InjectRepository(ProfileData)
     private readonly profileRepo: Repository<ProfileData>,
@@ -60,7 +63,11 @@ export class AdminService {
   }
 
   private async refreshRankings() {
-    await this.rankingService.refreshAllRankings().catch(() => null);
+    try {
+      await this.rankingService.refreshAllRankings();
+    } catch (error) {
+      this.logger.error('Failed to refresh rankings', error);
+    }
   }
 
   private async getOrCreateProfile(
