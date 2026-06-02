@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { RankingCriteriaConfig } from '../ranking-criteria.defaults';
 
 @Injectable()
 export class AcademicPerformanceService {
@@ -23,7 +24,13 @@ export class AcademicPerformanceService {
     this.logger.log(`GPA lookup initialized with ${this.gpaScoreLookup.size} entries`);
   }
 
-  calculateScore(gpa: number | null | undefined) {
+  calculateScore(gpa: number | null | undefined, criteria?: RankingCriteriaConfig) {
+    const academicCriteria = criteria?.academic;
+    const maximumScore = academicCriteria?.maximumScore ?? 30;
+    const minimumGpa = academicCriteria?.minimumGpa ?? 2.5;
+    const maximumGpa = academicCriteria?.maximumGpa ?? 4.0;
+    const minimumPassingScore = academicCriteria?.minimumPassingScore ?? 10;
+
     if (gpa === null || gpa === undefined) {
       return { score: 0, isFlagged: true, flagReason: 'GPA not available' };
     }
@@ -31,16 +38,29 @@ export class AcademicPerformanceService {
     const gpaRounded = Math.round(gpa * 100) / 100;
     const gpaKey = gpaRounded.toFixed(2);
 
-    if (gpaRounded < 2.5) {
+    if (gpaRounded < minimumGpa) {
       return {
         score: 0,
         isFlagged: true,
-        flagReason: `GPA ${gpaKey} is below minimum threshold of 2.5`,
+        flagReason: `GPA ${gpaKey} is below minimum threshold of ${minimumGpa}`,
       };
     }
 
-    if (gpaRounded > 4.0) {
-      return { score: 30, isFlagged: false, flagReason: null };
+    if (gpaRounded > maximumGpa) {
+      return { score: maximumScore, isFlagged: false, flagReason: null };
+    }
+
+    if (academicCriteria) {
+      const span = maximumGpa - minimumGpa;
+      const score = span > 0
+        ? minimumPassingScore + ((gpaRounded - minimumGpa) / span) * (maximumScore - minimumPassingScore)
+        : maximumScore;
+
+      return {
+        score: Math.round(score),
+        isFlagged: false,
+        flagReason: null,
+      };
     }
 
     return {

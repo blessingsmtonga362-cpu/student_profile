@@ -59,6 +59,7 @@ export class StudentNotificationController {
       data: notification,
     };
   }
+
  
  @Patch('read-all')
   async markAllAsReadPatch(@Req() req) {
@@ -74,6 +75,7 @@ export class StudentNotificationController {
 
   // Keep your existing POST endpoint for backward compatibility
   @Post('mark-all-read')
+
   // Mark all notifications as have been read
   @Patch('read-all')
   async markAllAsRead(@Req() req) {
@@ -104,7 +106,7 @@ export class StudentNotificationController {
   async clearAllNotifications(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.deleteAllNotifications(userId);
-
+    
     return {
       success: true,
       message: 'All notifications cleared',

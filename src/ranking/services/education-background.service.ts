@@ -4,19 +4,21 @@ import {
   EducationBackgroundScoreDto,
   EducationBackgroundScoreInputDto,
 } from '../dto/ranking-score.dto';
+import { RankingCriteriaConfig, ScoreBand } from '../ranking-criteria.defaults';
 
 @Injectable()
 export class EducationBackgroundService {
-  calculateScore(input: EducationBackgroundScoreInputDto): EducationBackgroundScoreDto {
+  calculateScore(input: EducationBackgroundScoreInputDto, criteria?: RankingCriteriaConfig): EducationBackgroundScoreDto {
+    const educationCriteria = criteria?.educationBackground;
     const primary = input.primary ?? null;
     const secondary = input.secondary ?? null;
     const primaryFees = this.normalizeNumber(primary?.tuitionFees);
     const secondaryFees = this.normalizeNumber(secondary?.tuitionFees);
     const primaryFunding = this.normalizeFunding(primary?.whoPaidFees);
     const secondaryFunding = this.normalizeFunding(secondary?.whoPaidFees);
-    const primaryScore = this.calculatePrimaryFeeScore(primaryFees);
-    const secondaryScore = this.calculateSecondaryFeeScore(secondaryFees);
-    const fundingScore = this.calculateFundingScore(primaryFunding, secondaryFunding);
+    const primaryScore = this.calculatePrimaryFeeScore(primaryFees, criteria);
+    const secondaryScore = this.calculateSecondaryFeeScore(secondaryFees, criteria);
+    const fundingScore = this.calculateFundingScore(primaryFunding, secondaryFunding, criteria);
     const flagReasons = this.getFlagReasons(primary, secondary, primaryFees, secondaryFees);
 
     return {
@@ -24,7 +26,7 @@ export class EducationBackgroundService {
       secondaryScore,
       fundingScore,
       totalScore: primaryScore + secondaryScore + fundingScore,
-      maximumScore: 15,
+      maximumScore: educationCriteria?.maximumScore ?? 15,
       isFlagged: flagReasons.length > 0,
       flagReason: flagReasons.length > 0 ? flagReasons.join('; ') : null,
       primaryFees,
@@ -34,8 +36,11 @@ export class EducationBackgroundService {
     };
   }
 
-  private calculatePrimaryFeeScore(fees: number | null): number {
+  private calculatePrimaryFeeScore(fees: number | null, criteria?: RankingCriteriaConfig): number {
     if (fees === null) return 0;
+    if (criteria?.educationBackground.primaryFeeBands) {
+      return this.findBand(fees, criteria.educationBackground.primaryFeeBands)?.score ?? 0;
+    }
     if (fees <= 5000) return 5;
     if (fees <= 20000) return 4;
     if (fees <= 50000) return 3;
@@ -43,8 +48,11 @@ export class EducationBackgroundService {
     return 0;
   }
 
-  private calculateSecondaryFeeScore(fees: number | null): number {
+  private calculateSecondaryFeeScore(fees: number | null, criteria?: RankingCriteriaConfig): number {
     if (fees === null) return 0;
+    if (criteria?.educationBackground.secondaryFeeBands) {
+      return this.findBand(fees, criteria.educationBackground.secondaryFeeBands)?.score ?? 0;
+    }
     if (fees <= 5000) return 7;
     if (fees <= 30000) return 6;
     if (fees <= 80000) return 5;
@@ -53,7 +61,7 @@ export class EducationBackgroundService {
     return 0;
   }
 
-  private calculateFundingScore(primaryFunding: string | null, secondaryFunding: string | null): number {
+  private calculateFundingScore(primaryFunding: string | null, secondaryFunding: string | null, criteria?: RankingCriteriaConfig): number {
     const fundingValues = [primaryFunding, secondaryFunding].filter(
       (funding): funding is string => funding !== null,
     );
@@ -62,11 +70,12 @@ export class EducationBackgroundService {
 
     const sponsorCount = fundingValues.filter((funding) => this.isSponsorFunding(funding)).length;
     const relativeCount = fundingValues.filter((funding) => this.isRelativeFunding(funding)).length;
+    const scores = criteria?.educationBackground.fundingScores;
 
-    if (sponsorCount === 2) return 3;
-    if (sponsorCount === 1 && relativeCount === 0) return 2;
-    if (sponsorCount > 0 || relativeCount > 0) return 1;
-    return 0;
+    if (sponsorCount === 2) return scores?.find((score) => score.key === 'two_sponsors')?.score ?? 3;
+    if (sponsorCount === 1 && relativeCount === 0) return scores?.find((score) => score.key === 'one_sponsor_no_relative')?.score ?? 2;
+    if (sponsorCount > 0 || relativeCount > 0) return scores?.find((score) => score.key === 'sponsor_or_relative')?.score ?? 1;
+    return scores?.find((score) => score.key === 'other')?.score ?? 0;
   }
 
   private getFlagReasons(
@@ -105,5 +114,9 @@ export class EducationBackgroundService {
     if (value === null || value === undefined || value === '') return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private findBand(value: number, bands: ScoreBand[]) {
+    return bands.find((band) => value >= band.minimum && (band.maximum === null || value <= band.maximum));
   }
 }

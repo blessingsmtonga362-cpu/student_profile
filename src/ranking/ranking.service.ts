@@ -26,6 +26,8 @@ import { DisabilityService } from './services/disability.service';
 import { EducationBackgroundService } from './services/education-background.service';
 import { FamilyBackgroundService } from './services/family-background.service';
 import { IntegrityCheckService } from './services/integrity-check.service';
+import { RankingCriteriaService } from './services/ranking-criteria.service';
+import { RankingCriteriaConfig } from './ranking-criteria.defaults';
 
 type SchoolStudentRecord = {
   name?: string;
@@ -50,6 +52,7 @@ export class RankingService {
     private readonly educationBackgroundService: EducationBackgroundService,
     private readonly integrityCheckService: IntegrityCheckService,
     private readonly disabilityService: DisabilityService,
+    private readonly rankingCriteriaService: RankingCriteriaService,
     private readonly configService: ConfigService,
     @InjectRepository(Family)
     private readonly familyRepository: Repository<Family>,
@@ -64,7 +67,8 @@ export class RankingService {
   ) {}
 
   async calculateStudentAcademicScore(gpa: number | null | undefined) {
-    return this.academicPerformanceService.calculateScore(gpa);
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
+    return this.academicPerformanceService.calculateScore(gpa, criteria);
   }
 
   async getLookupTableData() {
@@ -72,13 +76,15 @@ export class RankingService {
   }
 
   async calculateFamilyBackgroundScore(input: FamilyBackgroundScoreInputDto): Promise<FamilyBackgroundScoreDto> {
-    return this.familyBackgroundService.calculateScore(input);
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
+    return this.familyBackgroundService.calculateScore(input, criteria);
   }
 
   async calculateFamilyBackgroundScoreForUser(userId: string): Promise<FamilyBackgroundScoreDto> {
     const family = await this.familyRepository.findOne({ where: { userId } });
     if (!family) throw new NotFoundException(`Family background for user ${userId} was not found`);
 
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
     return this.familyBackgroundService.calculateScore({
       parentalStatus: family.parentalStatus,
       fatherMonthlyIncome: family.fatherMonthlyIncome,
@@ -89,15 +95,22 @@ export class RankingService {
       siblingsInPrimary: family.siblingsInPrimary,
       siblingsInSecondary: family.siblingsInSecondary,
       siblingsInTertiary: family.siblingsInTertiary,
-    });
+    }, criteria);
   }
 
   async getMonthlyIncomeLookupTableData(): Promise<MonthlyIncomeScoreLookupDto[]> {
-    return this.familyBackgroundService.getMonthlyIncomeLookupTableData();
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
+    return criteria.familyBackground.incomeBands.map((band) => ({
+      minimumIncome: band.minimum,
+      maximumIncome: band.maximum,
+      score: band.score,
+      isFlagged: band.isFlagged ?? false,
+    }));
   }
 
   async calculateEducationBackgroundScore(input: EducationBackgroundScoreInputDto): Promise<EducationBackgroundScoreDto> {
-    return this.educationBackgroundService.calculateScore(input);
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
+    return this.educationBackgroundService.calculateScore(input, criteria);
   }
 
   async calculateEducationBackgroundScoreForUser(userId: string): Promise<EducationBackgroundScoreDto> {
@@ -107,6 +120,7 @@ export class RankingService {
     const primary = educationRecords.find((record) => record.educationLevel === EducationLevel.PRIMARY);
     const secondary = educationRecords.find((record) => record.educationLevel === EducationLevel.SECONDARY);
 
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
     return this.educationBackgroundService.calculateScore({
       primary: primary ? {
         tuitionFees: primary.tuitionFees,
@@ -120,10 +134,11 @@ export class RankingService {
         certificateUrl: secondary.certificateUrl,
         isVerified: secondary.isVerified,
       } : null,
-    });
+    }, criteria);
   }
 
-  async scoreStudentFromSchoolDatabase(registrationNumber: string): Promise<SchoolStudentScoreDto> {
+  async scoreStudentFromSchoolDatabase(registrationNumber: string, criteria?: RankingCriteriaConfig): Promise<SchoolStudentScoreDto> {
+    const activeCriteria = criteria ?? await this.rankingCriteriaService.getActiveCriteria();
     const normalizedRegistrationNumber = registrationNumber?.trim();
     if (!normalizedRegistrationNumber) {
       return {
@@ -178,7 +193,7 @@ export class RankingService {
       };
     }
 
-    const scoreResult = this.academicPerformanceService.calculateScore(gpa);
+    const scoreResult = this.academicPerformanceService.calculateScore(gpa, activeCriteria);
     return {
       registrationNumber: student.registrationNumber ?? normalizedRegistrationNumber,
       foundInSchoolDatabase: true,
@@ -191,6 +206,47 @@ export class RankingService {
       studentName: student.name ?? null,
       department: student.department ?? null,
       yearOfStudy: student.yearOfStudy ?? null,
+    };
+  }
+
+  async verifyNationalIdFromNrb(nationalId: string): Promise<NrbVerificationDto> {
+    const normalizedNationalId = nationalId?.trim();
+    if (!normalizedNationalId) {
+      return {
+        nationalId: '',
+        foundInNrbDatabase: false,
+        fullName: null,
+        status: null,
+        isDeceased: false,
+        isFlagged: true,
+        flagReason: 'National ID is required',
+      };
+    }
+
+    const record = await this.fetchNrbRecordByNationalId(normalizedNationalId);
+    if (!record) {
+      return {
+        nationalId: normalizedNationalId,
+        foundInNrbDatabase: false,
+        fullName: null,
+        status: null,
+        isDeceased: false,
+        isFlagged: true,
+        flagReason: 'National ID was not found in the NRB database',
+      };
+    }
+
+    const status = record.status?.trim().toLowerCase() ?? null;
+    const isDeceased = status === 'deceased';
+
+    return {
+      nationalId: record.nationalId ?? normalizedNationalId,
+      foundInNrbDatabase: true,
+      fullName: record.fullName ?? null,
+      status,
+      isDeceased,
+      isFlagged: isDeceased,
+      flagReason: isDeceased ? 'NRB indicates this person is deceased' : null,
     };
   }
 
@@ -215,15 +271,31 @@ export class RankingService {
     return { schoolDatabase, nrbDatabase, connected: schoolDatabase.connected && nrbDatabase.connected };
   }
 
+  async getAdminDashboardRankings(page = 1, pageSize = 50): Promise<AdminDashboardPaginatedDto> {
+    const rankings = await this.refreshAllRankings();
+    const total = rankings.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const start = (page - 1) * pageSize;
+
+    return {
+      data: rankings.slice(start, start + pageSize),
+      total,
+      page,
+      pageSize,
+      totalPages,
+    };
+  }
+
   async calculateComprehensiveStudentScore(input: ComprehensiveStudentScoreInputDto): Promise<ComprehensiveStudentScoreDto> {
     const user = await this.userRepository.findOne({ where: { id: input.userId } });
     if (!user) throw new NotFoundException(`User ${input.userId} not found`);
 
     const personalDetails = await this.personalDetailsRepository.findOne({ where: { userId: input.userId } });
     if (!personalDetails) throw new NotFoundException(`Personal details for user ${input.userId} not found`);
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
 
     const schoolAcademicResult = input.gpa === null || input.gpa === undefined
-      ? await this.scoreStudentFromSchoolDatabase(personalDetails.registrationNumber).catch(() => ({
+      ? await this.scoreStudentFromSchoolDatabase(personalDetails.registrationNumber, criteria).catch(() => ({
           academicScore: 0,
           isFlagged: true,
           flagReason: 'Unable to verify student against the school database',
@@ -233,10 +305,10 @@ export class RankingService {
 
     const academicResult = schoolAcademicResult
       ? { score: schoolAcademicResult.academicScore ?? 0, isFlagged: schoolAcademicResult.isFlagged ?? false, flagReason: schoolAcademicResult.flagReason ?? null }
-      : this.academicPerformanceService.calculateScore(input.gpa);
+      : this.academicPerformanceService.calculateScore(input.gpa, criteria);
 
     const familyResult = input.familyBackgroundInput
-      ? this.familyBackgroundService.calculateScore(input.familyBackgroundInput)
+      ? this.familyBackgroundService.calculateScore(input.familyBackgroundInput, criteria)
       : await this.calculateFamilyBackgroundScoreForUser(input.userId).catch(() => ({
           parentStatusScore: 0,
           monthlyIncomeScore: 0,
@@ -244,7 +316,7 @@ export class RankingService {
           educationBurdenScore: 0,
           educationBurdenWeightedTotal: 0,
           currentScore: 0,
-          maximumScore: 40,
+          maximumScore: criteria.familyBackground.maximumScore,
           isFlagged: true,
           flagReason: 'Family records not found',
           parentalStatus: null,
@@ -256,13 +328,13 @@ export class RankingService {
         }));
 
     const educationResult = input.educationBackgroundInput
-      ? this.educationBackgroundService.calculateScore(input.educationBackgroundInput)
+      ? this.educationBackgroundService.calculateScore(input.educationBackgroundInput, criteria)
       : await this.calculateEducationBackgroundScoreForUser(input.userId).catch(() => ({
           primaryScore: 0,
           secondaryScore: 0,
           fundingScore: 0,
           totalScore: 0,
-          maximumScore: 15,
+          maximumScore: criteria.educationBackground.maximumScore,
           isFlagged: true,
           flagReason: 'Education records not found',
           primaryFees: null,
@@ -281,12 +353,12 @@ export class RankingService {
       deceasedParentNationalIds: input.integrityCheckInput?.deceasedParentNationalIds || this.getDeceasedParentNationalIds(familyDetailsForIntegrity),
       isDeceased: input.integrityCheckInput?.isDeceased,
       requiredDocumentsSubmitted: input.integrityCheckInput?.requiredDocumentsSubmitted,
-    });
+    }, criteria);
 
     const disabilityResult = await this.disabilityService.calculateScore({
       userId: input.userId,
       disability: input.disabilityInput?.disability,
-    });
+    }, criteria);
 
     const totalScore =
       academicResult.score +
@@ -294,7 +366,12 @@ export class RankingService {
       educationResult.totalScore +
       integrityResult.totalScore +
       disabilityResult.score;
-    const maximumTotalScore = 100;
+    const maximumTotalScore =
+      criteria.academic.maximumScore +
+      criteria.familyBackground.maximumScore +
+      criteria.educationBackground.maximumScore +
+      criteria.integrityCheck.maximumScore +
+      criteria.disability.maximumScore;
     const overallPercentage = Math.round((totalScore / maximumTotalScore) * 100);
 
     const flagReasons = [
@@ -310,11 +387,11 @@ export class RankingService {
       firstName: personalDetails.firstName,
       lastName: personalDetails.lastName,
       registrationNumber: personalDetails.registrationNumber,
-      academicScore: { score: academicResult.score, maximumScore: 30, percentage: Math.round((academicResult.score / 30) * 100) },
-      familyBackgroundScore: { score: familyResult.currentScore, maximumScore: 40, percentage: Math.round((familyResult.currentScore / 40) * 100) },
-      educationBackgroundScore: { score: educationResult.totalScore, maximumScore: 15, percentage: Math.round((educationResult.totalScore / 15) * 100) },
-      integrityCheckScore: { score: integrityResult.totalScore, maximumScore: 8, percentage: Math.round((integrityResult.totalScore / 8) * 100) },
-      disabilityScore: { score: disabilityResult.score, maximumScore: 7, percentage: Math.round((disabilityResult.score / 7) * 100) },
+      academicScore: this.toScoreComponent(academicResult.score, criteria.academic.maximumScore),
+      familyBackgroundScore: this.toScoreComponent(familyResult.currentScore, criteria.familyBackground.maximumScore),
+      educationBackgroundScore: this.toScoreComponent(educationResult.totalScore, criteria.educationBackground.maximumScore),
+      integrityCheckScore: this.toScoreComponent(integrityResult.totalScore, criteria.integrityCheck.maximumScore),
+      disabilityScore: this.toScoreComponent(disabilityResult.score, criteria.disability.maximumScore),
       totalScore,
       maximumTotalScore,
       overallPercentage,
@@ -326,6 +403,7 @@ export class RankingService {
   async refreshAllRankings(): Promise<AdminDashboardRankingDto[]> {
     const users = await this.userRepository.find({ where: { role: Role.User } });
     if (users.length === 0) return [];
+    const criteria = await this.rankingCriteriaService.getActiveCriteria();
 
     const userIds = users.map((user) => user.id);
     const [personalDetails, families, educationRecords, profiles] = await Promise.all([
@@ -355,7 +433,7 @@ export class RankingService {
       const family = familyMap.get(user.id);
       const educations = educationMap.get(user.id) ?? [];
 
-      const academicScore = await this.scoreStudentFromSchoolDatabase(personalDetail.registrationNumber).catch(() => ({
+      const academicScore = await this.scoreStudentFromSchoolDatabase(personalDetail.registrationNumber, criteria).catch(() => ({
         registrationNumber: personalDetail.registrationNumber,
         foundInSchoolDatabase: false,
         isRegistered: false,
@@ -380,7 +458,7 @@ export class RankingService {
             siblingsInPrimary: family.siblingsInPrimary,
             siblingsInSecondary: family.siblingsInSecondary,
             siblingsInTertiary: family.siblingsInTertiary,
-          })
+          }, criteria)
         : {
             parentStatusScore: 0,
             monthlyIncomeScore: 0,
@@ -388,7 +466,7 @@ export class RankingService {
             educationBurdenScore: 0,
             educationBurdenWeightedTotal: 0,
             currentScore: 0,
-            maximumScore: 40,
+            maximumScore: criteria.familyBackground.maximumScore,
             isFlagged: true,
             flagReason: 'Family data not found',
             parentalStatus: null,
@@ -415,13 +493,13 @@ export class RankingService {
               certificateUrl: secondary.certificateUrl,
               isVerified: secondary.isVerified,
             } : null,
-          })
+          }, criteria)
         : {
             primaryScore: 0,
             secondaryScore: 0,
             fundingScore: 0,
             totalScore: 0,
-            maximumScore: 15,
+            maximumScore: criteria.educationBackground.maximumScore,
             isFlagged: true,
             flagReason: 'Education data not found',
             primaryFees: null,
@@ -436,12 +514,12 @@ export class RankingService {
         nationalId: personalDetail.nationalIdNumber,
         parentNationalId: this.getLivingParentNationalId(family),
         deceasedParentNationalIds: this.getDeceasedParentNationalIds(family),
-      });
+      }, criteria);
 
       const disabilityScore = await this.disabilityService.calculateScore({
         userId: user.id,
         disability: personalDetail.disability,
-      });
+      }, criteria);
 
       const totalScore =
         academicScore.academicScore +
@@ -449,7 +527,13 @@ export class RankingService {
         educationScore.totalScore +
         integrityScore.totalScore +
         disabilityScore.score;
-      const overallPercentage = Math.round(totalScore);
+      const maximumTotalScore =
+        criteria.academic.maximumScore +
+        criteria.familyBackground.maximumScore +
+        criteria.educationBackground.maximumScore +
+        criteria.integrityCheck.maximumScore +
+        criteria.disability.maximumScore;
+      const overallPercentage = maximumTotalScore > 0 ? Math.round((totalScore / maximumTotalScore) * 100) : 0;
       const primaryFlagReason =
         academicScore.flagReason ||
         familyScore.flagReason ||
@@ -503,199 +587,35 @@ export class RankingService {
       profile.scoreFlagReason = primaryFlagReason ?? '';
       profile.scoreUpdatedAt = new Date();
 
-      // ── Auto-flag logic ──────────────────────────────────────────────────────
-      // Automatically move a profile to 'flagged' when the scoring engine
-      // detects a verifiable problem that requires admin attention.
-      // Only applies to profiles that have NOT already been manually reviewed
-      // (approved or flagged) by an admin — we never override a human decision.
-      const isManuallyReviewed =
-        profile.status === 'approved' || profile.status === 'flagged';
-
-      if (!isManuallyReviewed) {
-        // Collect every specific reason that warrants an auto-flag
-        const autoFlagReasons: string[] = [];
-
-        // 1. Student not found in UNIMA school database
-        if (!academicScore.foundInSchoolDatabase) {
-          autoFlagReasons.push(
-            academicScore.flagReason ?? 'Student not found in UNIMA school database',
-          );
-        }
-
-        // 2. Student's own national ID — missing, invalid format, or not in NRB
-        if (!personalDetail.nationalIdNumber?.trim()) {
-          autoFlagReasons.push("Student national ID not provided");
-        } else if (!/^[A-Z0-9]{3,50}$/i.test(personalDetail.nationalIdNumber.trim())) {
-          autoFlagReasons.push(
-            `Student national ID "${personalDetail.nationalIdNumber}" has an invalid format`,
-          );
-        } else if (integrityScore.nationalIdVerified === 0) {
-          // The integrity check already hit NRB and it failed — extract the
-          // specific reason from the integrity flag string if available
-          const nidReason = integrityScore.flagReason
-            ?.split('; ')
-            .find((r) => r.toLowerCase().includes('national id') && !r.toLowerCase().includes('parent'));
-          autoFlagReasons.push(
-            nidReason ?? `Student national ID "${personalDetail.nationalIdNumber}" not verified in NRB`,
-          );
-        }
-
-        // 3. Living parent / guardian national ID — missing, invalid, or not in NRB
-        //    Collect all living-parent IDs that were submitted
-        const livingParentIds: Array<{ label: string; id: string }> = [
-          family?.fatherNationalId ? { label: 'Father', id: family.fatherNationalId } : null,
-          family?.motherNationalId ? { label: 'Mother', id: family.motherNationalId } : null,
-          family?.parentNationalId ? { label: 'Parent', id: family.parentNationalId } : null,
-          family?.guardianNationalId ? { label: 'Guardian', id: family.guardianNationalId } : null,
-        ].filter((x): x is { label: string; id: string } => x !== null);
-
-        if (livingParentIds.length === 0 && !family) {
-          autoFlagReasons.push('No family/guardian information provided');
-        } else {
-          for (const { label, id } of livingParentIds) {
-            const trimmed = id.trim();
-            if (!trimmed) {
-              autoFlagReasons.push(`${label} national ID is empty`);
-            } else if (!/^[A-Z0-9]{3,50}$/i.test(trimmed)) {
-              autoFlagReasons.push(`${label} national ID "${trimmed}" has an invalid format`);
-            }
-            // NRB lookup failures for parent IDs are already captured in
-            // integrityScore.flagReason — we surface them below
-          }
-        }
-
-        // 4. Deceased parent IDs — missing from NRB or not marked deceased
-        const deceasedIds = [
-          family?.deceasedFatherId ? { label: 'Deceased father', id: family.deceasedFatherId } : null,
-          family?.deceasedMotherId ? { label: 'Deceased mother', id: family.deceasedMotherId } : null,
-          family?.deceasedParentId ? { label: 'Deceased parent', id: family.deceasedParentId } : null,
-        ].filter((x): x is { label: string; id: string } => x !== null);
-
-        for (const { label, id } of deceasedIds) {
-          const trimmed = id.trim();
-          if (!trimmed) {
-            autoFlagReasons.push(`${label} national ID is empty`);
-          } else if (!/^[A-Z0-9]{3,50}$/i.test(trimmed)) {
-            autoFlagReasons.push(`${label} national ID "${trimmed}" has an invalid format`);
-          }
-          // NRB deceased-status failures are captured in integrityScore.flagReason
-        }
-
-        // 5. Any remaining integrity-check NRB failures (parent IDs not in NRB,
-        //    deceased status mismatches, death-verification failures) that weren't
-        //    already covered by the format checks above
-        if (integrityScore.isFlagged && integrityScore.flagReason) {
-          const integrityReasons = integrityScore.flagReason
-            .split('; ')
-            .filter((r) => {
-              const lower = r.toLowerCase();
-              // Skip reasons already added above
-              return (
-                !lower.includes('registration number') &&
-                !(lower.includes('national id') && !lower.includes('parent') && !lower.includes('guardian'))
-              );
-            });
-          autoFlagReasons.push(...integrityReasons);
-        }
-
-        if (autoFlagReasons.length > 0) {
-          profile.status = 'flagged';
-          // Deduplicate reasons and build the comment
-          const uniqueReasons = [...new Set(autoFlagReasons)];
-          profile.reviewComments =
-            profile.reviewComments?.trim() ||
-            `Auto-flagged: ${uniqueReasons.join('; ')}`;
-          // Also persist the full flag reason for the score breakdown panel
-          profile.scoreFlagReason = uniqueReasons.join('; ');
-        }
-      }
-      // ── End auto-flag logic ──────────────────────────────────────────────────
+      // scoreFlagged / scoreFlagReason are informational only  they surface
+      // scoring anomalies in the admin review panel but do NOT change the
+      // profile status. Only an admin can set status to 'flagged'.
 
       profileMap.set(user.id, profile);
     }
 
-    rankings.sort((a, b) => b.totalScore - a.totalScore || a.lastName.localeCompare(b.lastName));
+    rankings.sort((a, b) => b.totalScore - a.totalScore);
     rankings.forEach((ranking, index) => {
       ranking.rank = index + 1;
-      const profile = profileMap.get(ranking.studentId);
-      if (profile) {
-        profile.rank = ranking.rank;
-      }
     });
 
     await this.profileRepository.save([...profileMap.values()]);
+
     return rankings;
   }
 
-  async getAdminDashboardRankings(page = 1, pageSize = 50): Promise<AdminDashboardPaginatedDto> {
-    const rankings = await this.refreshAllRankings();
-    const start = (page - 1) * pageSize;
-    const data = rankings.slice(start, start + pageSize);
+  private toScoreComponent(score: number, maximumScore: number) {
     return {
-      data,
-      total: rankings.length,
-      page,
-      pageSize,
-      totalPages: Math.ceil(rankings.length / pageSize),
+      score,
+      maximumScore,
+      percentage: maximumScore > 0 ? Math.round((score / maximumScore) * 100) : 0,
     };
   }
 
-  async verifyNationalIdFromNrb(nationalId: string): Promise<NrbVerificationDto> {
-    const normalizedNationalId = nationalId?.trim();
-    if (!normalizedNationalId) {
-      return {
-        nationalId: '',
-        foundInNrbDatabase: false,
-        fullName: null,
-        status: null,
-        isDeceased: false,
-        isFlagged: true,
-        flagReason: 'National ID is required',
-      };
-    }
-
-    const record = await this.fetchNrbRecordByNationalId(normalizedNationalId);
-    if (!record) {
-      return {
-        nationalId: normalizedNationalId,
-        foundInNrbDatabase: false,
-        fullName: null,
-        status: null,
-        isDeceased: false,
-        isFlagged: true,
-        flagReason: 'National ID was not found in the NRB database',
-      };
-    }
-
-    const status = record.status?.trim().toLowerCase() ?? null;
-    return {
-      nationalId: record.nationalId ?? normalizedNationalId,
-      foundInNrbDatabase: true,
-      fullName: record.fullName ?? null,
-      status,
-      isDeceased: status === 'deceased',
-      isFlagged: false,
-      flagReason: null,
-    };
-  }
-
-  private async checkConnection(url: string) {
-    try {
-      const resp = await this.fetchWithTimeout(url);
-      return {
-        connected: resp.ok,
-        url,
-        statusCode: resp.status,
-        statusText: resp.statusText,
-      };
-    } catch (error) {
-      return {
-        connected: false,
-        url,
-        statusCode: 0,
-        statusText: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+  private parseSchoolGpa(gpa: string | number | null | undefined): number | null {
+    if (gpa === null || gpa === undefined || gpa === '') return null;
+    const parsed = Number(gpa);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private async fetchSchoolStudentByRegistrationNumber(registrationNumber: string): Promise<SchoolStudentRecord | null> {
@@ -703,24 +623,13 @@ export class RankingService {
       const response = await this.fetchWithTimeout(`${this.getUnimaApiBaseUrl()}/student-data/${encodeURIComponent(registrationNumber)}`);
       if (response.status === 404 || !response.ok) return null;
 
-      // UNIMA API returns an empty body (not 404) when a student is not found
       const text = await response.text();
       if (!text || text.trim() === '' || text.trim() === 'null') return null;
 
-      try {
-        return JSON.parse(text) as SchoolStudentRecord;
-      } catch {
-        return null;
-      }
+      return JSON.parse(text) as SchoolStudentRecord;
     } catch {
       return null;
     }
-  }
-
-  private parseSchoolGpa(gpa: string | number | null | undefined): number | null {
-    if (gpa === null || gpa === undefined || gpa === '') return null;
-    const parsed = Number(gpa);
-    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private async fetchNrbRecordByNationalId(nationalId: string): Promise<NrbRecord | null> {
@@ -751,6 +660,25 @@ export class RankingService {
   private getNrbApiBaseUrl(): string {
     return (this.configService.get<string>('NRB_DAME_API_URL')
       || this.configService.get<string>('NRB_API_URL', 'http://localhost:3005')).replace(/\/+$/, '');
+  }
+
+  private async checkConnection(url: string) {
+    try {
+      const response = await this.fetchWithTimeout(url);
+
+      return {
+        connected: response.ok,
+        status: response.status,
+        url,
+      };
+    } catch (error) {
+      return {
+        connected: false,
+        status: null,
+        url,
+        error: error instanceof Error ? error.message : 'Connection check failed',
+      };
+    }
   }
 
   private async fetchWithTimeout(url: string): Promise<Response> {
