@@ -9,6 +9,7 @@ import { ProfileData } from 'src/application/entities/profile_data';
 import { ReviewService } from 'src/application/services/review.service';
 import { UserService } from 'src/user/user.service';
 import { RankingService } from 'src/ranking/ranking.service';
+import { RankingCriteriaService } from '../ranking/services/ranking-criteria.service';
 
 @Injectable()
 export class SponsorService {
@@ -23,6 +24,7 @@ export class SponsorService {
     private readonly reviewService: ReviewService,
     private readonly userService: UserService,
     private readonly rankingService: RankingService,
+    private readonly rankingCriteriaService: RankingCriteriaService,
   ) {}
 
   private async buildApprovedApplicantPool(excludedUserIds: string[] = []) {
@@ -98,12 +100,26 @@ export class SponsorService {
       logoFilename = uploaded.filename;
     }
 
+    let isCriteriaActivated = false;
+    
+    // If rankingCriteriaId is provided, activate the criteria
+    if (createDto.rankingCriteriaId) {
+      try {
+        await this.rankingCriteriaService.activateTemplate(createDto.rankingCriteriaId);
+        isCriteriaActivated = true;
+      } catch (err) {
+        throw new BadRequestException(`Failed to activate criteria: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
+    }
+
     const sponsor = await this.sponsorRepo.save(
       this.sponsorRepo.create({
         name: createDto.name,
         requestedSlots: createDto.requestedSlots,
         logoUrl,
         logoFilename,
+        rankingCriteriaId: createDto.rankingCriteriaId || null,
+        isCriteriaActivated,
       }),
     );
 
@@ -143,6 +159,8 @@ export class SponsorService {
         name: sponsor.name,
         logoUrl: sponsor.logoUrl,
         requestedSlots: sponsor.requestedSlots,
+        rankingCriteriaId: sponsor.rankingCriteriaId,
+        isCriteriaActivated: sponsor.isCriteriaActivated,
         allocatedCount,
         status: allocatedCount >= sponsor.requestedSlots ? 'completed' : allocatedCount > 0 ? 'partial' : 'pending',
       };
@@ -191,9 +209,26 @@ export class SponsorService {
       logoUrl: sponsor.logoUrl,
       logoFilename: sponsor.logoFilename,
       requestedSlots: sponsor.requestedSlots,
+      rankingCriteriaId: sponsor.rankingCriteriaId,
+      isCriteriaActivated: sponsor.isCriteriaActivated,
       allocatedCount: applicants.length,
       status: applicants.length >= sponsor.requestedSlots ? 'completed' : applicants.length > 0 ? 'partial' : 'pending',
       applicants,
+    };
+  }
+
+  async deleteSponsor(id: string) {
+    const sponsor = await this.sponsorRepo.findOne({ where: { id } });
+    if (!sponsor) {
+      throw new NotFoundException('Sponsor not found');
+    }
+
+    await this.allocationRepo.delete({ sponsorId: id });
+    await this.sponsorRepo.delete(id);
+
+    return {
+      success: true,
+      message: 'Sponsor deleted successfully',
     };
   }
 }

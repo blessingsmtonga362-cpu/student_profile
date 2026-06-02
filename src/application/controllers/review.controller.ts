@@ -73,22 +73,14 @@ export class ReviewController {
 
   private mapFeePayer(value: unknown): FeePayer {
     const normalized = this.toOptionalString(value)?.toLowerCase();
-    if (!normalized) return undefined as unknown as FeePayer;
+    if (!normalized) {
+      throw new BadRequestException('Fee payer must be either parent or sponsor');
+    }
 
-    const map: Record<string, FeePayer> = {
-      mother: FeePayer.PARENT,
-      father: FeePayer.PARENT,
-      parent: FeePayer.PARENT,
-      parents: FeePayer.PARENT,
-      sponsor: FeePayer.SPONSOR,
-      ngo: FeePayer.SPONSOR,
-      scholarship: FeePayer.SCHOLARSHIP,
-      guardian: FeePayer.GUARDIAN,
-      self: FeePayer.SELF,
-      other: FeePayer.OTHER,
-    };
-
-    return map[normalized] ?? FeePayer.OTHER;
+    if (normalized === 'parent') return FeePayer.PARENT;
+    if (normalized === 'sponsor') return FeePayer.SPONSOR;
+    
+    throw new BadRequestException('Fee payer must be either parent or sponsor');
   }
 
   private hasAnyEducationValue(levelData: any): boolean {
@@ -218,7 +210,6 @@ export class ReviewController {
   @Get('my-application')
   async getMyCompleteApplication(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
-    
     const [personalDetails, familyDetails, education] = await Promise.all([
       this.personalDetailService.findByUserId(userId).catch(() => null),
       this.familyService.findByUserId(userId).catch(() => null),
@@ -267,8 +258,6 @@ export class ReviewController {
       message: 'Personal details deleted successfully',
     };
   }
-
- 
   @Get('family-details')
   async getFamilyDetails(@Req() req) {
     const userId = await this.getUserIdFromRequest(req);
@@ -367,25 +356,19 @@ export class ReviewController {
     const userId = await this.getUserIdFromRequest(req);
 
     try {
-      // VALIDATES all sections are complete before allowing final submission
-
       this.validateEducationSection('Primary', applicationData.education?.primary);
       this.validateEducationSection('Secondary', applicationData.education?.secondary);
       this.validateEducationSection('Tertiary', applicationData.education?.tertiary);
 
-      // SAVE personal details
       if (applicationData.personal) {
         const personalData = this.normalizePersonalPayload(applicationData);
         await this.personalDetailService.upsertByUserId(userId, personalData as any);
       }
       
-      // SAVE family details
       if (applicationData.family) {
         const familyData = this.normalizeFamilyPayload(applicationData.family);
         await this.familyService.upsertByUserId(userId, familyData as any);
       }
-      
-
       if (applicationData.education?.primary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -394,7 +377,6 @@ export class ReviewController {
         );
       }
 
-      // SAVE secondary education
       if (applicationData.education?.secondary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -403,7 +385,6 @@ export class ReviewController {
         );
       }
 
-      // SAVE tertiary education (optional)
       if (applicationData.education?.tertiary?.schoolName) {
         await this.educationService.upsertByLevel(
           userId,
@@ -415,9 +396,8 @@ export class ReviewController {
         );
       }
 
-      // MARK SUBMISSION AS COMPLETE
       const applicationReference = `APP-${Date.now()}-${userId.slice(0, 8)}`;
-      const submission = await this.submissionService.markAsSubmitted(userId, applicationReference);
+      await this.submissionService.markAsSubmitted(userId, applicationReference);
 
       return {
         success: true,
@@ -464,6 +444,4 @@ export class ReviewController {
       applicationStatus: 'pending_review',
     };
   }
-  
 }
-
