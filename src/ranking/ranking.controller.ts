@@ -1,5 +1,8 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Roles } from '../auth/role.decorator';
+import { Role } from '../auth/role.enum';
 import { Public } from '../auth/metadata';
+import { SaveRankingCriteriaTemplateDto } from './dto/ranking-criteria.dto';
 import {
   AdminDashboardPaginatedDto,
   ComprehensiveStudentScoreDto,
@@ -14,11 +17,55 @@ import {
   SchoolStudentScoreDto,
   ScoreCalculationResultDto,
 } from './dto/ranking-score.dto';
+import { RankingCriteriaService } from './services/ranking-criteria.service';
 import { RankingService } from './ranking.service';
 
 @Controller('ranking')
 export class RankingController {
-  constructor(private readonly rankingService: RankingService) {}
+  constructor(
+    private readonly rankingService: RankingService,
+    private readonly rankingCriteriaService: RankingCriteriaService,
+  ) {}
+
+  @Roles(Role.Admin)
+  @Get('criteria')
+  async getCriteria() {
+    return this.rankingCriteriaService.getTemplates();
+  }
+
+  @Roles(Role.Admin)
+  @Post('criteria/templates')
+  async saveCriteriaTemplate(@Body() dto: SaveRankingCriteriaTemplateDto) {
+    const template = await this.rankingCriteriaService.saveTemplate(dto);
+    if (dto.activate) {
+      await this.rankingService.refreshAllRankings();
+    }
+    return template;
+  }
+
+  @Roles(Role.Admin)
+  @Patch('criteria/templates/:id/activate')
+  async activateCriteriaTemplate(@Param('id') id: string) {
+    const template = await this.rankingCriteriaService.activateTemplate(id);
+    await this.rankingService.refreshAllRankings();
+    return template;
+  }
+
+  @Roles(Role.Admin)
+  @Patch('criteria/default/activate')
+  async activateDefaultCriteria() {
+    const defaultCriteria = await this.rankingCriteriaService.useDefaultCriteria();
+    await this.rankingService.refreshAllRankings();
+    return defaultCriteria;
+  }
+
+  @Roles(Role.Admin)
+  @Delete('criteria/templates/:id')
+  async deleteCriteriaTemplate(@Param('id') id: string) {
+    const result = await this.rankingCriteriaService.deleteTemplate(id);
+    await this.rankingService.refreshAllRankings();
+    return result;
+  }
 
   @Public()
   @Post('calculate-score')

@@ -13,6 +13,8 @@ import { PersonalDetails } from '../application/entities/personal_details.entity
 import { User } from '../user/entities/user.entity';
 import { VerificationLog } from '../application/entities/verification-log.entity';
 import { ProfileData } from '../application/entities/profile_data';
+import { RankingCriteriaTemplate } from './entities/ranking-criteria-template.entity';
+import { RankingCriteriaService } from './services/ranking-criteria.service';
 
 @Module({
   imports: [
@@ -23,6 +25,7 @@ import { ProfileData } from '../application/entities/profile_data';
       User,
       VerificationLog,
       ProfileData,
+      RankingCriteriaTemplate,
     ]),
   ],
   controllers: [RankingController],
@@ -33,7 +36,8 @@ import { ProfileData } from '../application/entities/profile_data';
     FamilyBackgroundService,
     DisabilityService,
     IntegrityCheckService,
+    RankingCriteriaService,
   ],
-  exports: [RankingService],
+  exports: [RankingService, RankingCriteriaService],
 })
 export class RankingModule {}

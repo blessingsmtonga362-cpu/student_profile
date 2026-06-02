@@ -60,26 +60,8 @@ export class StudentNotificationController {
     };
   }
 
-<<<<<<< HEAD
- 
- @Patch('read-all')
-  async markAllAsReadPatch(@Req() req) {
-    const userId = req.user.id;
-    const result = await this.notificationService.markAllAsRead(userId);
-    
-    return {
-      success: true,
-      message: `${result.count} notifications marked as read`,
-      count: result.count,
-    };
-  }
-
-  // Keep your existing POST endpoint for backward compatibility
-  @Post('mark-all-read')
-=======
   // Mark all notifications as have been read
   @Patch('read-all')
->>>>>>> 99928fe ( application and notification resolving errors)
   async markAllAsRead(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.markAllAsRead(userId);
@@ -103,22 +85,9 @@ export class StudentNotificationController {
     };
   }
 
-  // ✅ ADD THIS - Match frontend's DELETE /student/notifications
-  @Delete()
-  async clearAllNotifications(@Req() req) {
-    const userId = req.user.id;
-    const result = await this.notificationService.deleteAllNotifications(userId);
-    
-    return {
-      success: true,
-      message: 'All notifications cleared',
-      count: result.count,
-    };
-  }
-
-  // Keep your existing DELETE endpoint for backward compatibility
+  // Delete all notifications (Clear all)
   @Delete('clear-all')
-  async clearAllNotificationsAlt(@Req() req) {
+  async clearAllNotifications(@Req() req) {
     const userId = req.user.id;
     const result = await this.notificationService.deleteAllNotifications(userId);
     

@@ -1,14 +1,17 @@
 import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { OtpService } from './otp.service';
 import { AuthGuard } from './auth.guard';
 import { Public } from './metadata';
 import { UserService } from '../user/user.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
+import { SendOtpDto, VerifyOtpDto } from './dto/otp.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly otpService: OtpService,
     private readonly userService: UserService,
   ) {}
 
@@ -44,7 +47,35 @@ export class AuthController {
   getProfile(@Request() req) {
     return req.user;
   }
-  
+
+  /**
+   * OTP Endpoints for Phone Verification (Application Submission)
+   */
+
+  @Public()
+  @Post('send-phone-otp')
+  @HttpCode(HttpStatus.OK)
+  async sendPhoneOtp(@Body() dto: SendOtpDto) {
+    return this.otpService.sendOtp(dto);
+  }
+
+  @Public()
+  @Post('verify-phone-otp')
+  @HttpCode(HttpStatus.OK)
+  async verifyPhoneOtp(@Body() dto: VerifyOtpDto) {
+    return this.otpService.verifyOtp(dto);
+  }
+
+  @Public()
+  @Post('check-phone-verified')
+  @HttpCode(HttpStatus.OK)
+  async checkPhoneVerified(@Body() body: { phoneNumber: string }) {
+    const verified = await this.otpService.isPhoneVerified(body.phoneNumber, 'application_submission');
+    return {
+      success: true,
+      verified,
+    };
+  }
 }
 /*
 import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';

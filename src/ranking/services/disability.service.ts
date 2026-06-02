@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PersonalDetails, Disability } from '../../application/entities/personal_details.entity';
 import { DisabilityScoreDto, DisabilityScoreInputDto } from '../dto/ranking-score.dto';
+import { RankingCriteriaConfig } from '../ranking-criteria.defaults';
 
 @Injectable()
 export class DisabilityService {
@@ -13,7 +14,8 @@ export class DisabilityService {
     private readonly personalDetailsRepository: Repository<PersonalDetails>,
   ) {}
 
-  async calculateScore(input: DisabilityScoreInputDto): Promise<DisabilityScoreDto> {
+  async calculateScore(input: DisabilityScoreInputDto, criteria?: RankingCriteriaConfig): Promise<DisabilityScoreDto> {
+    const disabilityCriteria = criteria?.disability;
     let disabilityStatus = input.disability;
 
     if (!disabilityStatus) {
@@ -25,8 +27,8 @@ export class DisabilityService {
         return {
           hasDisability: false,
           disabilityType: null,
-          score: 0,
-          maximumScore: 7,
+          score: disabilityCriteria?.noDisabilityScore ?? 0,
+          maximumScore: disabilityCriteria?.maximumScore ?? 7,
           isFlagged: true,
           flagReason: 'Unable to verify disability status',
         };
@@ -39,8 +41,8 @@ export class DisabilityService {
     return {
       hasDisability,
       disabilityType: hasDisability ? normalizedDisability : null,
-      score: hasDisability ? 7 : 0,
-      maximumScore: 7,
+      score: hasDisability ? (disabilityCriteria?.disabilityScore ?? 7) : (disabilityCriteria?.noDisabilityScore ?? 0),
+      maximumScore: disabilityCriteria?.maximumScore ?? 7,
       isFlagged: false,
       flagReason: null,
     };

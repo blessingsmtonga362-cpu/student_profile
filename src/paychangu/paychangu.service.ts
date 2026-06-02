@@ -50,6 +50,8 @@ export class PaychanguService {
       `${this.configService.get<string>('BACKEND_URL', 'http://localhost:3001')}/webhooks/paychangu`,
     );
 
+    const merchantId = this.configService.get<string>('PAYCHANGU_MERCHANT_ID');
+
     const payload = {
       amount,
       currency: 'MWK',
@@ -57,6 +59,7 @@ export class PaychanguService {
         'PAYCHANGU_ADMIN_EMAIL',
         'admin@school.com',
       ),
+      ...(merchantId ? { merchant_id: merchantId } : {}),
       callback_url: callbackUrl,
       return_url: returnUrl,
       cancel_url: cancelUrl,

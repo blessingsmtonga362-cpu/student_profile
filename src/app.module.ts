@@ -29,7 +29,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     'DB_PORT',
     'DB_USERNAME',
     'DB_PASSWORD',
-    'DB_NAME', // ✅ Changed from DB_NAME to DB_NAME (keep as is)
+    'DB_NAME',
     'JWT_SECRET',
   ] as const;
 
@@ -67,9 +67,9 @@ function validateEnv(config: Record<string, string | undefined>) {
         type: 'postgres' as const,
         host: configService.get<string>('DB_HOST', 'localhost'),
         port: Number(configService.get<string>('DB_PORT', '5432')),
-        username: configService.get<string>('DB_USERNAME', 'postgres'),
-        password: configService.get<string>('DB_PASSWORD', '2001'),
-        database: configService.get<string>('DB_NAME', 'student-db'), //
+        username: configService.get<string>('DB_USERNAME', 'blessings'),
+        password: configService.get<string>('DB_PASSWORD', '2745'),
+        database: configService.get<string>('DB_NAME', 'student_profile'), //
         autoLoadEntities: true,
         synchronize: configService.get<string>('DB_SYNC', 'true') === 'true',
         logging: configService.get<string>('DB_LOGGING', 'false') === 'true',

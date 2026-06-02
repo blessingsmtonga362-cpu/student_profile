@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { PersonalDetails } from '../../application/entities/personal_details.entity';
 import { VerificationLog } from '../../application/entities/verification-log.entity';
 import { IntegrityCheckScoreDto, IntegrityCheckScoreInputDto } from '../dto/ranking-score.dto';
+import { RankingCriteriaConfig } from '../ranking-criteria.defaults';
 
 @Injectable()
 export class IntegrityCheckService {
@@ -18,24 +19,28 @@ export class IntegrityCheckService {
     private readonly configService: ConfigService,
   ) {}
 
-  async calculateScore(input: IntegrityCheckScoreInputDto): Promise<IntegrityCheckScoreDto> {
+  async calculateScore(input: IntegrityCheckScoreInputDto, criteria?: RankingCriteriaConfig): Promise<IntegrityCheckScoreDto> {
+    const integrityCriteria = criteria?.integrityCheck;
     const flagReasons: string[] = [];
-    const regNumberScore = await this.checkRegistrationNumber(input.registrationNumber, flagReasons);
-    const nationalIdScore = await this.checkNationalId(input.nationalId, flagReasons);
+    const regNumberScore = await this.checkRegistrationNumber(input.registrationNumber, flagReasons, integrityCriteria?.registrationNumberScore ?? 1);
+    const nationalIdScore = await this.checkNationalId(input.nationalId, flagReasons, integrityCriteria?.nationalIdScore ?? 1);
     const parentIdScore = await this.checkParentId(
       input.parentNationalId,
       input.deceasedParentNationalIds,
       flagReasons,
+      integrityCriteria?.parentIdScore ?? 2,
     );
     const deathVerificationScore = await this.checkDeathVerification(
       input.nationalId || input.registrationNumber,
       input.isDeceased,
       flagReasons,
+      integrityCriteria?.deathVerificationScore ?? 2,
     );
     const documentsScore = await this.checkRequiredDocuments(
       input.userId,
       input.requiredDocumentsSubmitted,
       flagReasons,
+      integrityCriteria?.requiredDocumentsScore ?? 2,
     );
 
     const totalScore =
@@ -48,20 +53,20 @@ export class IntegrityCheckService {
       deathVerificationConsistent: deathVerificationScore,
       requiredDocuments: documentsScore,
       totalScore,
-      maximumScore: 8,
+      maximumScore: integrityCriteria?.maximumScore ?? 8,
       isFlagged: flagReasons.length > 0,
       flagReason: flagReasons.length > 0 ? flagReasons.join('; ') : null,
       details: {
         registrationNumberMatched: regNumberScore > 0,
         nationalIdVerified: nationalIdScore > 0,
         parentIdVerified: parentIdScore > 0,
-        deathVerificationConsistent: deathVerificationScore === 2,
-        allRequiredDocuments: documentsScore === 2,
+        deathVerificationConsistent: deathVerificationScore === (integrityCriteria?.deathVerificationScore ?? 2),
+        allRequiredDocuments: documentsScore === (integrityCriteria?.requiredDocumentsScore ?? 2),
       },
     };
   }
 
-  private async checkRegistrationNumber(registrationNumber: string | undefined, flagReasons: string[]): Promise<number> {
+  private async checkRegistrationNumber(registrationNumber: string | undefined, flagReasons: string[], successScore: number): Promise<number> {
     if (!registrationNumber?.trim()) {
       flagReasons.push('Registration number not provided');
       return 0;
@@ -107,14 +112,14 @@ export class IntegrityCheckService {
         return 0;
       }
 
-      return 1;
+      return successScore;
     } catch {
       flagReasons.push('Error verifying registration number with school API');
       return 0;
     }
   }
 
-  private async checkNationalId(nationalId: string | undefined, flagReasons: string[]): Promise<number> {
+  private async checkNationalId(nationalId: string | undefined, flagReasons: string[], successScore: number): Promise<number> {
     if (!nationalId?.trim()) {
       flagReasons.push('National ID not provided');
       return 0;
@@ -147,14 +152,14 @@ export class IntegrityCheckService {
         return 0;
       }
 
-      return 1;
+      return successScore;
     } catch {
       flagReasons.push('Error verifying National ID with NRB');
       return 0;
     }
   }
 
-  private async checkParentId(parentNationalId: string | undefined, deceasedParentNationalIds: string[] | undefined, flagReasons: string[]): Promise<number> {
+  private async checkParentId(parentNationalId: string | undefined, deceasedParentNationalIds: string[] | undefined, flagReasons: string[], successScore: number): Promise<number> {
     const livingParentId = parentNationalId?.trim();
     const deceasedParentIds = (deceasedParentNationalIds ?? []).map((id) => id?.trim()).filter((id): id is string => !!id);
 
@@ -192,14 +197,14 @@ export class IntegrityCheckService {
         }
       }
 
-      return 2;
+      return successScore;
     } catch {
       flagReasons.push('Error verifying parent national ID with NRB');
       return 0;
     }
   }
 
-  private async checkDeathVerification(nationalIdOrRegistration: string | undefined, isDeceased: boolean | undefined, flagReasons: string[]): Promise<number> {
+  private async checkDeathVerification(nationalIdOrRegistration: string | undefined, isDeceased: boolean | undefined, flagReasons: string[], successScore: number): Promise<number> {
     if (isDeceased === true) {
       flagReasons.push('Student is marked as deceased');
       return 0;
@@ -248,16 +253,16 @@ export class IntegrityCheckService {
         return 0;
       }
 
-      return 2;
+      return successScore;
     } catch {
       flagReasons.push('Error verifying death status');
       return 0;
     }
   }
 
-  private async checkRequiredDocuments(userId: string, requiredDocumentsSubmitted: boolean | undefined, flagReasons: string[]): Promise<number> {
+  private async checkRequiredDocuments(userId: string, requiredDocumentsSubmitted: boolean | undefined, flagReasons: string[], successScore: number): Promise<number> {
     if (requiredDocumentsSubmitted !== undefined) {
-      return requiredDocumentsSubmitted ? 2 : 0;
+      return requiredDocumentsSubmitted ? successScore : 0;
     }
 
     try {
@@ -270,10 +275,10 @@ export class IntegrityCheckService {
       const hasStudentId = !!personalDetails.studentIdPdfUrl;
       const hasNationalId = !!personalDetails.nationalIdPdfUrl;
 
-      if (hasStudentId && hasNationalId) return 2;
+      if (hasStudentId && hasNationalId) return successScore;
       if (hasStudentId || hasNationalId) {
         flagReasons.push('Required documents are missing');
-        return 1;
+        return Math.floor(successScore / 2);
       }
 
       flagReasons.push('Required documents are missing');

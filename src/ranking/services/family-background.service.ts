@@ -4,6 +4,7 @@ import {
   FamilyBackgroundScoreInputDto,
   MonthlyIncomeScoreLookupDto,
 } from '../dto/ranking-score.dto';
+import { RankingCriteriaConfig, ScoreBand } from '../ranking-criteria.defaults';
 
 @Injectable()
 export class FamilyBackgroundService {
@@ -16,14 +17,15 @@ export class FamilyBackgroundService {
     { minimumIncome: 700001, maximumIncome: null, score: 0, isFlagged: true },
   ];
 
-  calculateScore(input: FamilyBackgroundScoreInputDto): FamilyBackgroundScoreDto {
+  calculateScore(input: FamilyBackgroundScoreInputDto, criteria?: RankingCriteriaConfig): FamilyBackgroundScoreDto {
+    const familyCriteria = criteria?.familyBackground;
     const parentalStatus = this.normalizeParentStatus(input.parentalStatus);
     const assessedMonthlyIncome = this.getAssessedMonthlyIncome(input, parentalStatus);
-    const parentStatusScore = this.calculateParentStatusScore(parentalStatus);
-    const incomeResult = this.calculateMonthlyIncomeScore(assessedMonthlyIncome);
-    const siblingScore = this.calculateSiblingScore(input.numberOfSiblings);
+    const parentStatusScore = this.calculateParentStatusScore(parentalStatus, criteria);
+    const incomeResult = this.calculateMonthlyIncomeScore(assessedMonthlyIncome, criteria);
+    const siblingScore = this.calculateSiblingScore(input.numberOfSiblings, criteria);
     const educationBurdenWeightedTotal = this.calculateEducationBurdenWeightedTotal(input);
-    const educationBurdenScore = this.calculateEducationBurdenScore(educationBurdenWeightedTotal);
+    const educationBurdenScore = this.calculateEducationBurdenScore(educationBurdenWeightedTotal, criteria);
     const flagReasons: string[] = [];
 
     if (incomeResult.isFlagged) flagReasons.push('Monthly income is above 700000');
@@ -37,7 +39,7 @@ export class FamilyBackgroundService {
       educationBurdenScore,
       educationBurdenWeightedTotal,
       currentScore: parentStatusScore + incomeResult.score + siblingScore + educationBurdenScore,
-      maximumScore: 40,
+      maximumScore: familyCriteria?.maximumScore ?? 40,
       isFlagged: flagReasons.length > 0,
       flagReason: flagReasons.length > 0 ? flagReasons.join('; ') : null,
       parentalStatus,
@@ -53,28 +55,40 @@ export class FamilyBackgroundService {
     return this.incomeBands;
   }
 
-  private calculateParentStatusScore(parentalStatus: string | null): number {
+  private calculateParentStatusScore(parentalStatus: string | null, criteria?: RankingCriteriaConfig): number {
     if (!parentalStatus) return 0;
-    if (['none', 'no parent', 'no parents', 'orphan', 'guardian', 'guardian next of kin'].includes(parentalStatus)) return 15;
-    if (['one', 'single parent', 'single', 'one parent'].includes(parentalStatus)) return 10;
-    if (['both', 'both parents', 'two parents'].includes(parentalStatus)) return 4;
+    const scores = criteria?.familyBackground.parentStatusScores;
+    if (['none', 'no parent', 'no parents', 'orphan', 'guardian', 'guardian next of kin'].includes(parentalStatus)) {
+      return scores?.find((score) => score.key === 'none')?.score ?? 15;
+    }
+    if (['one', 'single parent', 'single', 'one parent'].includes(parentalStatus)) {
+      return scores?.find((score) => score.key === 'one')?.score ?? 10;
+    }
+    if (['both', 'both parents', 'two parents'].includes(parentalStatus)) {
+      return scores?.find((score) => score.key === 'both')?.score ?? 4;
+    }
     return 0;
   }
 
-  private calculateMonthlyIncomeScore(monthlyIncome: number | null) {
+  private calculateMonthlyIncomeScore(monthlyIncome: number | null, criteria?: RankingCriteriaConfig) {
     if (monthlyIncome === null) return { score: 0, isFlagged: false };
 
-    const band = this.incomeBands.find((incomeBand) => {
-      const meetsMinimum = monthlyIncome >= incomeBand.minimumIncome;
-      const meetsMaximum = incomeBand.maximumIncome === null || monthlyIncome <= incomeBand.maximumIncome;
-      return meetsMinimum && meetsMaximum;
-    });
+    const band = criteria?.familyBackground.incomeBands
+      ? this.findBand(monthlyIncome, criteria.familyBackground.incomeBands)
+      : this.incomeBands.find((incomeBand) => {
+          const meetsMinimum = monthlyIncome >= incomeBand.minimumIncome;
+          const meetsMaximum = incomeBand.maximumIncome === null || monthlyIncome <= incomeBand.maximumIncome;
+          return meetsMinimum && meetsMaximum;
+        });
 
     return { score: band?.score ?? 0, isFlagged: band?.isFlagged ?? true };
   }
 
-  private calculateSiblingScore(numberOfSiblings: number | null | undefined): number {
+  private calculateSiblingScore(numberOfSiblings: number | null | undefined, criteria?: RankingCriteriaConfig): number {
     const siblings = this.normalizeNumber(numberOfSiblings);
+    if (siblings !== null && criteria?.familyBackground.siblingBands) {
+      return this.findBand(siblings, criteria.familyBackground.siblingBands)?.score ?? 0;
+    }
     if (siblings === null || siblings <= 3) return 0;
     if (siblings <= 5) return 1;
     if (siblings <= 7) return 2;
@@ -89,7 +103,10 @@ export class FamilyBackgroundService {
     return primary + secondary * 2 + tertiary * 3;
   }
 
-  private calculateEducationBurdenScore(weightedTotal: number): number {
+  private calculateEducationBurdenScore(weightedTotal: number, criteria?: RankingCriteriaConfig): number {
+    if (criteria?.familyBackground.educationBurdenBands) {
+      return this.findBand(weightedTotal, criteria.familyBackground.educationBurdenBands)?.score ?? 0;
+    }
     if (weightedTotal <= 2) return 0;
     if (weightedTotal <= 4) return 2;
     if (weightedTotal <= 6) return 3;
@@ -121,5 +138,9 @@ export class FamilyBackgroundService {
     if (value === null || value === undefined || value === '') return null;
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private findBand(value: number, bands: ScoreBand[]) {
+    return bands.find((band) => value >= band.minimum && (band.maximum === null || value <= band.maximum));
   }
 }
