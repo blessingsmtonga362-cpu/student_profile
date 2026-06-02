@@ -1,73 +1,67 @@
 import {
-  Injectable,
   BadRequestException,
-  UnauthorizedException,
+  Injectable,
   Logger,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
+import * as https from 'https';
 import { OtpEntity } from './entities/otp.entity';
 import { SendOtpDto, VerifyOtpDto, OtpResponseDto } from './dto/otp.dto';
 
+/** * OTP Service — SMS delivery via Africa's Talking official Node.js SDK. ...apapa lets hope itheka maguy
+* * Sandbox:  username = "sandbox"  (set in .env)
+* Live:     username = your app name in the AT dashboard */
 @Injectable()
 export class OtpService {
   private readonly logger = new Logger(OtpService.name);
+
   private readonly OTP_LENGTH = 6;
   private readonly OTP_EXPIRY_MINUTES = 10;
   private readonly MAX_ATTEMPTS = 5;
 
   constructor(
     @InjectRepository(OtpEntity)
-    private otpRepository: Repository<OtpEntity>,
-    private configService: ConfigService,
+    private readonly otpRepository: Repository<OtpEntity>,
+    private readonly configService: ConfigService,
   ) {}
 
-  /**
-   * Generate a random OTP code
-   */
-  private generateOtpCode(): string {
-    return Math.floor(Math.random() * 1000000)
-      .toString()
-      .padStart(this.OTP_LENGTH, '0');
-  }
+  // Public API yomwe titenge ikhala iyiyi apa
 
-  /**
-   * Send OTP to phone number
-   */
+  /** Generate, persist, and send an OTP to the given phone number via SMS. */
   async sendOtp(dto: SendOtpDto): Promise<OtpResponseDto> {
     const { phoneNumber, purpose = 'phone_verification' } = dto;
 
-    // Check if there's a valid OTP already sent in the last minute
+    // Rate-limit: one OTP per phone per 60 seconds
     const recentOtp = await this.otpRepository.findOne({
-      where: {
-        phoneNumber,
-        verified: false,
-        createdAt: new Date(Date.now() - 60000), // Last 1 minute
-      },
+      where: { phoneNumber, verified: false },
       order: { createdAt: 'DESC' },
     });
 
-    if (recentOtp && new Date(recentOtp.expiresAt) > new Date()) {
+    if (
+      recentOtp &&
+      new Date(recentOtp.expiresAt) > new Date() &&
+      Date.now() - new Date(recentOtp.createdAt).getTime() < 60_000
+    ) {
       throw new BadRequestException(
-        'An OTP was recently sent to this number. Please wait before requesting another.',
+        'A code was recently sent to this number. Please wait before requesting another.',
       );
     }
 
-    // Invalidate previous unverified OTPs for this phone/purpose
+    // Expire all previous unverified OTPs for this phone + purpose
     await this.otpRepository.update(
       { phoneNumber, purpose, verified: false },
-      { expiresAt: new Date() }, // Expire immediately
+      { expiresAt: new Date() },
     );
 
-    // Generate new OTP
+    // Generate and persist the new OTP
     const code = this.generateOtpCode();
     const expiresAt = new Date(
       Date.now() + this.OTP_EXPIRY_MINUTES * 60 * 1000,
     );
 
-    // Save to database
     const otp = this.otpRepository.create({
       phoneNumber,
       code,
@@ -75,28 +69,25 @@ export class OtpService {
       purpose,
       attempts: 0,
     });
-
     await this.otpRepository.save(otp);
 
-    // Send OTP via SMS
+    // Deliver via SMS
+    const normalised = this.normalizePhone(phoneNumber);
     await this.sendViaSms(phoneNumber, code);
 
-    this.logger.log(`OTP sent to ${phoneNumber} for ${purpose}`);
+    this.logger.log(`OTP sent to ${normalised} for purpose="${purpose}"`);
 
     return {
       success: true,
-      message: `OTP sent to ${phoneNumber}. Valid for ${this.OTP_EXPIRY_MINUTES} minutes.`,
+      message: `Verification code sent to ${phoneNumber}. Valid for ${this.OTP_EXPIRY_MINUTES} minutes.`,
       expiresIn: this.OTP_EXPIRY_MINUTES * 60,
     };
   }
 
-  /**
-   * Verify OTP code
-   */
+  /** Verify the OTP code submitted by the user. */
   async verifyOtp(dto: VerifyOtpDto): Promise<OtpResponseDto> {
     const { phoneNumber, code, purpose = 'phone_verification' } = dto;
 
-    // Find the most recent OTP for this phone
     const otp = await this.otpRepository.findOne({
       where: { phoneNumber, purpose },
       order: { createdAt: 'DESC' },
@@ -106,36 +97,30 @@ export class OtpService {
       throw new UnauthorizedException('No OTP found for this phone number.');
     }
 
-    // Check if expired
     if (new Date(otp.expiresAt) < new Date()) {
       throw new UnauthorizedException('OTP has expired. Request a new one.');
     }
 
-    // Check if already verified
     if (otp.verified) {
       throw new BadRequestException('OTP already verified.');
     }
 
-    // Check attempts
     if (otp.attempts >= this.MAX_ATTEMPTS) {
-      // Expire the OTP
-      otp.expiresAt = new Date();
+      otp.expiresAt = new Date(); // expire immediately
       await this.otpRepository.save(otp);
       throw new UnauthorizedException(
-        `Maximum verification attempts exceeded. Request a new OTP.`,
+        'Maximum verification attempts exceeded. Request a new OTP.',
       );
     }
 
-    // Verify code
     if (otp.code !== code) {
       otp.attempts += 1;
       await this.otpRepository.save(otp);
       throw new UnauthorizedException(
-        `Invalid OTP code. ${this.MAX_ATTEMPTS - otp.attempts} attempts remaining.`,
+        `Invalid code. ${this.MAX_ATTEMPTS - otp.attempts} attempts remaining.`,
       );
     }
 
-    // Mark as verified
     otp.verified = true;
     await this.otpRepository.save(otp);
 
@@ -148,151 +133,157 @@ export class OtpService {
     };
   }
 
-  /**
-   * Check if phone has a verified OTP
-   */
+  /** Returns true if the phone has a verified OTP for the given purpose. */
   async isPhoneVerified(
     phoneNumber: string,
     purpose = 'phone_verification',
   ): Promise<boolean> {
-    const verified = await this.otpRepository.findOne({
-      where: {
-        phoneNumber,
-        purpose,
-        verified: true,
-      },
+    const record = await this.otpRepository.findOne({
+      where: { phoneNumber, purpose, verified: true },
       order: { createdAt: 'DESC' },
     });
-
-    return !!verified;
+    return !!record;
   }
 
-  /**
-   * Send OTP via SMS using Twilio or Africa's Talking
-   */
-  private async sendViaSms(phoneNumber: string, code: string) {
-    const provider = this.configService.get<string>(
-      'OTP_PROVIDER',
-      'console',
+  /** Remove expired OTP rows — hook into a scheduler if desired. */
+  async cleanupExpiredOtps(): Promise<number> {
+    const result = await this.otpRepository.delete({ expiresAt: new Date() });
+    return result.affected ?? 0;
+  }
+
+  //  Private helpers mmene analongosolera mu documentetion ija simnasithe kwambiri just follow 
+
+  private generateOtpCode(): string {
+    return Math.floor(Math.random() * 1_000_000)
+      .toString()
+      .padStart(this.OTP_LENGTH, '0');
+  }
+
+  /** ndakuyikila the following instructions kuti ku froentend titha kutumiza phone number mu different formats, and this function idzakonza kuti ikhale mu format yomwe Africa's Talking imafuna.
+  * Normalise any Malawi phone number to international format (+265XXXXXXXXX).
+  * Africa's Talking requires the + prefix.
+  * Numbers are stored as +265XXXXXXXXX so this is mostly a safety net.
+  *   "+265991234567"  → "+265991234567"
+  *   "265991234567"   → "+265991234567"
+  *   "0991234567"     → "+265991234567"
+  *   "991234567"      → "+265991234567"
+  */
+  private normalizePhone(phoneNumber: string): string {
+    const digits = phoneNumber.replace(/\D/g, '');
+    if (digits.startsWith('265') && digits.length === 12) return `+${digits}`;
+    if (digits.startsWith('0') && digits.length === 10) return `+265${digits.slice(1)}`;
+    if ((digits.startsWith('8') || digits.startsWith('9')) && digits.length === 9) return `+265${digits}`;
+    // Already correct or unknown — return as-is
+    return phoneNumber.startsWith('+') ? phoneNumber : `+265${digits}`;
+  }
+
+  //  SMS delivery via Africa's Talking (Node https — preserves header casing) 
+
+  /** ma instructin ali mmusiwa ndawalemba mwa straightforward kuti ife titha kutumiza SMS using Africa's Talking, ndipo ndagwiritsa ntchito Node's built-in https module chifukwa Africa's Talking imafuna header key kuti ikhale exactly `apiKey` (camelCase), ndipo axios imasinthe header keys kukhala lowercase, zomwe zimayambitsa mavuto. Node's https.request imasunga header casing monga momwe zilili.
+  * Send the OTP via Africa's Talking SMS REST API.
+  *
+  * We use Node's built-in `https` module instead of axios because axios
+  * normalises header keys to lowercase before sending, but Africa's Talking
+  * requires the header to be exactly `apiKey` (camelCase).
+  * Node's https.request preserves the header casing as written.
+  *
+  * Sandbox : https://api.sandbox.africastalking.com/version1/messaging
+  * Live    : https://api.africastalking.com/version1/messaging
+  *
+  * Required .env:
+  *   AFRICAS_TALKING_API_KEY   — sandbox app API key from AT dashboard
+  *   AFRICAS_TALKING_USERNAME  — "sandbox" for test, your app name for live
+  */
+  private sendViaSms(phoneNumber: string, code: string): Promise<void> {
+    const apiKey = this.configService.get<string>('AFRICAS_TALKING_API_KEY');
+    const username = this.configService.get<string>(
+      'AFRICAS_TALKING_USERNAME',
+      'sandbox',
     );
 
-    if (provider === 'twilio') {
-      await this.sendViaTwilioSms(phoneNumber, code);
-    } else if (provider === 'africastalking') {
-      await this.sendViaAfricasTalking(phoneNumber, code);
-    } else if (provider === 'console') {
-      // Development mode - log to console
-      this.logger.log(`[DEV MODE] OTP Code: ${code} sent to ${phoneNumber}`);
-    } else {
-      throw new BadRequestException(
-        'OTP provider not configured correctly. Set OTP_PROVIDER in .env.',
+    if (!apiKey) {
+      return Promise.reject(
+        new BadRequestException(
+          'AFRICAS_TALKING_API_KEY is not configured in .env.',
+        ),
       );
     }
-  }
 
-  /**
-   * Send via Twilio SMS API
-   * Requires: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_SMS_FROM
-   */
-  private async sendViaTwilioSms(phoneNumber: string, code: string) {
-    try {
-      const accountSid = this.configService.get<string>(
-        'TWILIO_ACCOUNT_SID',
-      );
-      const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
-      const fromNumber = this.configService.get<string>(
-        'TWILIO_SMS_FROM',
-      );
+    const recipient = this.normalizePhone(phoneNumber);
+    const isSandbox = username === 'sandbox';
+    const hostname = isSandbox
+      ? 'api.sandbox.africastalking.com'
+      : 'api.africastalking.com';
 
-      if (!accountSid || !authToken || !fromNumber) {
-        this.logger.warn('Twilio credentials not configured');
-        throw new BadRequestException('Twilio SMS credentials are not configured.');
-      }
+    const message =
+      `Your Mthandizi verification code is: ${code}. ` +
+      `Valid for ${this.OTP_EXPIRY_MINUTES} minutes. Do not share it.`;
 
-      const recipient = phoneNumber.startsWith('+')
-        ? phoneNumber
-        : `+${phoneNumber.replace(/\D/g, '')}`;
+    const body = new URLSearchParams({ username, to: recipient, message }).toString();
 
-      const payload = new URLSearchParams();
-      payload.append('From', fromNumber);
-      payload.append('To', recipient);
-      payload.append('Body', `Your verification code is: ${code}`);
-
-      await axios.post(
-        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-        payload.toString(),
+    return new Promise((resolve, reject) => {
+      const req = https.request(
         {
-          auth: {
-            username: accountSid,
-            password: authToken,
-          },
+          hostname,
+          path: '/version1/messaging',
+          method: 'POST',
           headers: {
+            // Africa's Talking requires exact camelCase — do NOT rename this
+            apiKey,
+            Accept: 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Length': Buffer.byteLength(body),
           },
+        },
+        (res) => {
+          let raw = '';
+          res.on('data', (chunk: string) => (raw += chunk));
+          res.on('end', () => {
+            // AT returns 201 on success
+            if (res.statusCode === 201 || res.statusCode === 200) {
+              try {
+                const parsed = JSON.parse(raw) as {
+                  SMSMessageData: {
+                    Message: string;
+                    Recipients: Array<{
+                      number: string;
+                      status: string;
+                      statusCode: number;
+                      cost: string;
+                    }>;
+                  };
+                };
+                for (const r of parsed.SMSMessageData?.Recipients ?? []) {
+                  if (r.statusCode === 101) {
+                    this.logger.log(
+                      `[AT SMS] Sent to ${r.number} — ${r.status}, cost: ${r.cost}`,
+                    );
+                  } else {
+                    this.logger.warn(
+                      `[AT SMS] Delivery issue for ${r.number} — ${r.status} (${r.statusCode})`,
+                    );
+                  }
+                }
+              } catch {
+                this.logger.log(`[AT SMS] Response: ${raw}`);
+              }
+              resolve();
+            } else {
+              const err = `HTTP ${res.statusCode}: ${raw}`;
+              this.logger.error(`[AT SMS] Failed — ${err}`);
+              reject(new BadRequestException(`Failed to send verification SMS: ${err}`));
+            }
+          });
         },
       );
 
-      this.logger.log(
-        `[TWILIO SMS] Sent OTP ${code} to ${recipient} from ${fromNumber}`,
-      );
-    } catch (error: any) {
-      const errorMessage =
-        error?.response?.data?.message || error?.message ||
-        'Failed to send OTP via Twilio SMS';
-      this.logger.error(`Failed to send OTP via Twilio SMS: ${errorMessage}`);
-      throw new BadRequestException(`Failed to send OTP: ${errorMessage}`);
-    }
-  }
+      req.on('error', (err: Error) => {
+        this.logger.error(`[AT SMS] Request error: ${err.message}`);
+        reject(new BadRequestException(`Failed to send verification SMS: ${err.message}`));
+      });
 
-  /**
-   * Send via Africa's Talking SMS API
-   * Requires: AFRICAS_TALKING_API_KEY, AFRICAS_TALKING_USERNAME
-   */
-
-  private async sendViaAfricasTalking(phoneNumber: string, code: string) {
-    try {
-      const apiKey = this.configService.get<string>(
-        'AFRICAS_TALKING_API_KEY',
-      );
-      const username = this.configService.get<string>(
-        'AFRICAS_TALKING_USERNAME',
-      );
-
-      if (!apiKey || !username) {
-        this.logger.warn("Africa's Talking credentials not configured");
-        throw new BadRequestException("Africa's Talking credentials are not configured.");
-      }
-
-      // For now, log the intent
-      this.logger.log(
-        `[AFRICAS_TALKING] Sending OTP ${code} to ${phoneNumber}`,
-      );
-
-      // TODO: Implement actual Africa's Talking integration
-      // const axios = require('axios');
-      // await axios.post('https://api.sandbox.africastalking.com/version1/messaging', {
-      //   username,
-      //   recipients: [phoneNumber],
-      //   message: `Your verification code is: ${code}`,
-      // }, {
-      //   headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      //   auth: { username, password: apiKey }
-      // });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send OTP via Africa's Talking: ${error.message}`,
-      );
-      throw new BadRequestException('Failed to send OTP');
-    }
-  }
-
-  /**
-   * Cleanup expired OTPs (run periodically)
-   */
-  async cleanupExpiredOtps(): Promise<number> {
-    const result = await this.otpRepository.delete({
-      expiresAt: new Date(),
+      req.write(body);
+      req.end();
     });
-    return result.affected || 0;
   }
 }

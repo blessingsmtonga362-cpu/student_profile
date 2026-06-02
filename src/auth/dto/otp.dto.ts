@@ -3,7 +3,7 @@ import { IsString, IsPhoneNumber, Length, IsOptional } from 'class-validator';
 export class SendOtpDto {
   @IsString()
   @IsPhoneNumber('MW') // Malawi phone number
-  phoneNumber: string;
+  phoneNumber!: string;
 
   @IsOptional()
   @IsString()
@@ -13,11 +13,11 @@ export class SendOtpDto {
 export class VerifyOtpDto {
   @IsString()
   @IsPhoneNumber('MW')
-  phoneNumber: string;
+  phoneNumber!: string;
 
   @IsString()
   @Length(6, 6, { message: 'OTP must be 6 digits' })
-  code: string;
+  code!: string;
 
   @IsOptional()
   @IsString()
@@ -25,8 +25,8 @@ export class VerifyOtpDto {
 }
 
 export class OtpResponseDto {
-  success: boolean;
-  message: string;
+  success!: boolean;
+  message!: string;
   expiresIn?: number; // seconds until OTP expires
   verified?: boolean;
 }
