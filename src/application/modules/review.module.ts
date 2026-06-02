@@ -1,7 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReviewController } from '../controllers/review.controller';
-import { StudentController } from '../../application/controllers/studentController';
+import { StudentController } from '../controllers/student.controller';
 import { ReviewService } from '../services/review.service';
 import { PersonalDetailService } from '../services/personal_details.service';
 import { FamilyService } from '../services/family.service';
