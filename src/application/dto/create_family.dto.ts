@@ -304,13 +304,13 @@ export class CreateFamilyDto {
   profession?: string;
 
   // Document URLs
-  @IsUrl()
-  @IsOptional()
-  deathCertificateUrl?: string;
+  //@IsUrl()
+  //@IsOptional()
+  //deathCertificateUrl?: string;
 
-  @IsUrl()
-  @IsOptional()
-  nationalIdUrl?: string;
+  //@IsUrl()
+  //@IsOptional()
+  //nationalIdUrl?: string;
 
   @IsUrl()
   @IsOptional()
@@ -320,11 +320,11 @@ export class CreateFamilyDto {
 export class UpdateFamilyDto extends PartialType(CreateFamilyDto) {}
 
 export class UploadFamilyDocumentsDto {
-  @IsOptional()
-  deathCertificate?: any;
+ // @IsOptional()
+  //deathCertificate?: any;
 
-  @IsOptional()
-  nationalId?: any;
+  //@IsOptional()
+  //nationalId?: any;
 
   @IsOptional()
   consentForm?: any;

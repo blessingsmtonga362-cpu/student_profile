@@ -9,28 +9,28 @@ import {
   UseGuards, 
   Req,
   UseInterceptors,
-  UploadedFiles,
+  UploadedFile,
   BadRequestException,
   ForbiddenException
 } from '@nestjs/common';
-import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { FamilyService } from '../services/family.service';
 import { FileService } from '../../file/file.service';
+import { DocumentVerificationService } from '../../file/document-verification.service';
 import { CreateFamilyDto, UpdateFamilyDto } from '../dto/create_family.dto';
 import { AuthGuard } from '../../auth/auth.guard';
-//import { Roles } from '../../auth/decorators/roles.decorator';
 
 @Controller('family')
 @UseGuards(AuthGuard)
 export class FamilyController {
   constructor(
     private readonly familyService: FamilyService,
-    private readonly fileService: FileService, // Inject FileService
+    private readonly fileService: FileService,
+    private readonly verificationService: DocumentVerificationService,
   ) {}
 
   @Post()
   async create(@Req() req, @Body() createDto: CreateFamilyDto & { userId?: number }) {
-    // Try to get userId from token first, then from body
     const userId = req.user?.userId || req.user?.id || createDto.userId;
     
     if (!userId) {
@@ -40,61 +40,75 @@ export class FamilyController {
     return await this.familyService.create(userId, createDto);
   }
 
-  @Post('upload-documents')
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'deathCertificate', maxCount: 1 },
-    { name: 'nationalId', maxCount: 1 },
-    { name: 'consentForm', maxCount: 1 },
-  ]))
-  async uploadDocuments(
+  @Post('upload-consent')
+  @UseInterceptors(FileInterceptor('consentForm'))
+  async uploadConsentForm(
     @Req() req,
-    @UploadedFiles() files: {
-      deathCertificate?: Express.Multer.File[],
-      nationalId?: Express.Multer.File[],
-      consentForm?: Express.Multer.File[],
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: {
+      fatherFirstName?: string;
+      fatherSurname?: string;
+      motherFirstName?: string;
+      motherSurname?: string;
+      guardianFirstName?: string;
+      guardianSurname?: string;
     }
   ) {
     const userId = req.user?.userId || req.user?.id;
-    
-    let deathCertificateUrl, nationalIdUrl, consentFormUrl;
 
-    // Upload death certificate using FileService
-    if (files.deathCertificate && files.deathCertificate[0]) {
-      const uploadResult = await this.fileService.uploadFile(
-        files.deathCertificate[0], 
-        'family-documents/death-certificates'
-      );
-      deathCertificateUrl = uploadResult.url;
+    if (!file) {
+      throw new BadRequestException('Consent form file is required');
     }
 
-    // Upload national ID using FileService
-    if (files.nationalId && files.nationalId[0]) {
-      const uploadResult = await this.fileService.uploadFile(
-        files.nationalId[0], 
-        'family-documents/national-ids'
+    // Validate that at least one parent/guardian info is provided
+    if (!body.fatherFirstName && !body.motherFirstName && !body.guardianFirstName) {
+      throw new BadRequestException(
+        'At least one parent or guardian information must be provided for verification'
       );
-      nationalIdUrl = uploadResult.url;
     }
 
-    // Upload consent form using FileService
-    if (files.consentForm && files.consentForm[0]) {
-      const uploadResult = await this.fileService.uploadFile(
-        files.consentForm[0], 
-        'family-documents/consent-forms'
-      );
-      consentFormUrl = uploadResult.url;
-    }
-
-    return await this.familyService.updateDocuments(
-      userId,
-      deathCertificateUrl,
-      nationalIdUrl,
-      consentFormUrl
+    // Verify consent form against provided parent/guardian names
+    const verification = await this.verificationService.verifyConsentForm(
+      file,
+      {
+        fatherFirstName: body.fatherFirstName,
+        fatherSurname: body.fatherSurname,
+        motherFirstName: body.motherFirstName,
+        motherSurname: body.motherSurname,
+        guardianFirstName: body.guardianFirstName,
+        guardianSurname: body.guardianSurname,
+      },
+      userId
     );
+
+    if (!verification.isVerified) {
+      throw new BadRequestException({
+        message: 'Consent form verification failed',
+        mismatches: verification.mismatches,
+        extractedData: verification.extractedData,
+      });
+    }
+
+    // Upload the verified consent form
+    const uploadResult = await this.fileService.uploadFile(
+      file,
+      'family-documents/consent-forms',
+      `consent-form-${userId}`
+    );
+
+    // Save the consent form URL to the family record
+    await this.familyService.updateConsentForm(userId, uploadResult.url);
+
+    return {
+      success: true,
+      message: 'Consent form uploaded and verified successfully',
+      matchedWith: verification.matchedWith,
+      extractedData: verification.extractedData,
+      fileUrl: uploadResult.url,
+    };
   }
 
   @Get()
-  //@Roles('admin', 'main_admin')
   async findAll() {
     return await this.familyService.findAll();
   }
@@ -106,9 +120,7 @@ export class FamilyController {
   }
 
   @Get('user/:userId')
- // @Roles('admin', 'main_admin')
   async findByUserId(@Param('userId') userId: string, @Req() req) {
-    // Allow admins to view any user, regular users can only view their own
     const isAdmin = req.user?.isAdmin || req.user?.is_admin;
     const currentUserId = req.user?.userId || req.user?.id;
     
@@ -125,14 +137,12 @@ export class FamilyController {
   }
 
   @Get(':id')
-  //@Roles('admin', 'main_admin')
   async findOne(@Param('id') id: string) {
     return await this.familyService.findOne(id);
   }
 
   @Patch()
   async update(@Req() req, @Body() updateDto: UpdateFamilyDto & { userId?: number }) {
-    // Try to get userId from token first, then from body
     const userId = req.user?.userId || req.user?.id || updateDto.userId;
     
     if (!userId) {
@@ -143,7 +153,6 @@ export class FamilyController {
   }
 
   @Patch(':id')
-  //@Roles('admin', 'main_admin')
   async updateById(@Param('id') id: string, @Body() updateDto: UpdateFamilyDto) {
     return await this.familyService.update(id, updateDto);
   }
@@ -155,9 +164,7 @@ export class FamilyController {
   }
 
   @Delete(':id')
-  //@Roles('admin', 'main_admin')
   async removeById(@Param('id') id: string) {
     return await this.familyService.remove(id);
   }
-  
 }

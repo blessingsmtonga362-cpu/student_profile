@@ -26,26 +26,20 @@ export class FamilyService {
       (Number(data.siblingsInTertiary) || 0);
     
     // Auto-correct numberStillInSchool based on the sum
-    // This ensures data consistency even if frontend sends wrong values
     if (data.numberStillInSchool !== calculatedTotal) {
-      // Log warning for debugging
       console.warn(
-        `Auto-correcting numberStillInSchool from ${data.numberStillInSchool} to ${calculatedTotal} (sum of primary, secondary, tertiary)`
+        `Auto-correcting numberStillInSchool from ${data.numberStillInSchool} to ${calculatedTotal}`
       );
-      
-      // Auto-correct the value
       data.numberStillInSchool = calculatedTotal;
     }
 
     // Validate that siblings in school doesn't exceed total siblings
     if (data.numberOfSiblings !== undefined && calculatedTotal > data.numberOfSiblings) {
       throw new BadRequestException(
-        `Number of siblings still in school (${calculatedTotal}) cannot exceed total number of siblings (${data.numberOfSiblings}). ` +
-        `Please check your sibling counts.`
+        `Number of siblings still in school (${calculatedTotal}) cannot exceed total number of siblings (${data.numberOfSiblings})`
       );
     }
 
-    // Validate that none of the sibling counts are negative
     if (data.numberOfSiblings !== undefined && data.numberOfSiblings < 0) {
       throw new BadRequestException('Number of siblings cannot be negative');
     }
@@ -56,7 +50,6 @@ export class FamilyService {
   }
 
   async create(userId: string, createDto: CreateFamilyDto): Promise<Family> {
-    // Validate and auto-correct sibling numbers before creating
     this.validateAndNormalizeSiblingNumbers(createDto);
 
     const existingFamily = await this.familyRepository.findOne({
@@ -76,7 +69,6 @@ export class FamilyService {
   }
 
   async upsertByUserId(userId: string, data: CreateFamilyDto): Promise<Family> {
-    // Validate and auto-correct sibling numbers before upsert
     this.validateAndNormalizeSiblingNumbers(data);
 
     const existingFamily = await this.familyRepository.findOne({
@@ -162,7 +154,6 @@ export class FamilyService {
   }
 
   async update(id: string, updateDto: UpdateFamilyDto): Promise<Family> {
-    // Validate and auto-correct sibling numbers before update
     this.validateAndNormalizeSiblingNumbers(updateDto);
     
     const family = await this.findOne(id);
@@ -171,7 +162,6 @@ export class FamilyService {
   }
 
   async updateByUserId(userId: string, updateDto: UpdateFamilyDto): Promise<Family> {
-    // Validate and auto-correct sibling numbers before update
     this.validateAndNormalizeSiblingNumbers(updateDto);
     
     const family = await this.findByUserId(userId);
@@ -179,6 +169,14 @@ export class FamilyService {
     return await this.familyRepository.save(family);
   }
 
+  // Updated: Only for consent form URL
+  async updateConsentForm(userId: string, consentFormUrl: string): Promise<Family> {
+    const family = await this.findByUserId(userId);
+    family.consentFormUrl = consentFormUrl;
+    return await this.familyRepository.save(family);
+  }
+
+  // Legacy method - kept for compatibility but only updates consent form
   async updateDocuments(
     userId: string, 
     deathCertificateUrl?: string, 
@@ -187,9 +185,8 @@ export class FamilyService {
   ): Promise<Family> {
     const family = await this.findByUserId(userId);
     
-    if (deathCertificateUrl) family.deathCertificateUrl = deathCertificateUrl;
-    if (nationalIdUrl) family.nationalIdUrl = nationalIdUrl;
     if (consentFormUrl) family.consentFormUrl = consentFormUrl;
+    // Death certificate and national ID are ignored now
     
     return await this.familyRepository.save(family);
   }
@@ -208,7 +205,6 @@ export class FamilyService {
     return Object.values(EducationLevel);
   }
 
-  // Helper method to get sibling summary for a user
   async getSiblingSummary(userId: string): Promise<{
     totalSiblings: number;
     siblingsInSchool: number;

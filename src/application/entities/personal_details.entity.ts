@@ -164,37 +164,55 @@ export class PersonalDetails {
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
-
-  // Phone number validation
-  private validatePhoneNumber(phone: string, fieldName: string): void {
-    if (!phone) {
-      throw new BadRequestException(`${fieldName} is required`);
-    }
-    
-    const cleanedNumber = phone.replace(/\D/g, '');
-    const last10Digits = cleanedNumber.slice(-10);
-    const phoneRegex = /^0[89][0-9]{8}$/;
-    
-    if (!phoneRegex.test(last10Digits)) {
-      throw new BadRequestException(
-        `${fieldName} must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)`
-      );
-    }
+// Phone number validation - updated for new format
+private validatePhoneNumber(phone: string, fieldName: string): void {
+  if (!phone) {
+    throw new BadRequestException(`${fieldName} is required`);
   }
-
-  private validatePaymentPhone(): void {
-    if (this.paymentMethod === 'tnm' || this.paymentMethod === 'tnm_mpamba') {
-      if (this.paymentPhoneNumber && !/^08\d{8}$/.test(this.paymentPhoneNumber)) {
-        throw new BadRequestException('TNM Mpamba number must start with 08 and be exactly 10 digits');
+  
+  // Remove any spaces, dashes, or other separators
+  let cleanedNumber = phone.replace(/[\s-]/g, '');
+  
+  // Remove any leading zeros if user accidentally types them
+  cleanedNumber = cleanedNumber.replace(/^0+/, '');
+  
+  // Validate: exactly 9 digits starting with 8 or 9
+  const phoneRegex = /^[89][0-9]{8}$/;
+  
+  if (!phoneRegex.test(cleanedNumber)) {
+    throw new BadRequestException(
+      `${fieldName} must be a valid Malawi phone number. Enter 9 digits starting with 9 (Airtel) or 8 (TNM). Example: 888123456 or 999123456`
+    );
+  }
+}
+// Payment phone validation - updated for new format
+private validatePaymentPhone(): void {
+  if (this.paymentMethod === 'tnm' || this.paymentMethod === 'tnm_mpamba') {
+    if (this.paymentPhoneNumber) {
+      // Remove any spaces, dashes, or leading zeros
+      let cleanedNumber = this.paymentPhoneNumber.replace(/[\s-]/g, '');
+      cleanedNumber = cleanedNumber.replace(/^0+/, '');
+      
+      // TNM numbers start with 8
+      if (!/^9\d{8}$/.test(cleanedNumber)) {
+        throw new BadRequestException('TNM Mpamba number must start with 8 and be exactly 9 digits (e.g., 888123456)');
       }
     }
-    
-    if (this.paymentMethod === 'airtel' || this.paymentMethod === 'airtel_money') {
-      if (this.paymentPhoneNumber && !/^09\d{8}$/.test(this.paymentPhoneNumber)) {
-        throw new BadRequestException('Airtel Money number must start with 09 and be exactly 10 digits');
+  }
+  
+  if (this.paymentMethod === 'airtel' || this.paymentMethod === 'airtel_money') {
+    if (this.paymentPhoneNumber) {
+      // Remove any spaces, dashes, or leading zeros
+      let cleanedNumber = this.paymentPhoneNumber.replace(/[\s-]/g, '');
+      cleanedNumber = cleanedNumber.replace(/^0+/, '');
+      
+      // Airtel numbers start with 9
+      if (!/^8\d{8}$/.test(cleanedNumber)) {
+        throw new BadRequestException('Airtel Money number must start with 9 and be exactly 9 digits (e.g., 999123456)');
       }
     }
   }
+}
 
   @BeforeInsert()
   @BeforeUpdate()

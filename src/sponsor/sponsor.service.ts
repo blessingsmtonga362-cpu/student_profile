@@ -9,7 +9,7 @@ import { ProfileData } from 'src/application/entities/profile_data';
 import { ReviewService } from 'src/application/services/review.service';
 import { UserService } from 'src/user/user.service';
 import { RankingService } from 'src/ranking/ranking.service';
-import { RankingCriteriaService } from 'src/ranking/services/ranking-criteria.service';
+import { RankingCriteriaService } from '../ranking/services/ranking-criteria.service';
 
 @Injectable()
 export class SponsorService {

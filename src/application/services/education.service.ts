@@ -1,3 +1,4 @@
+
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -12,45 +13,42 @@ export class EducationService {
     @InjectRepository(Education)
     private educationRepository: Repository<Education>,
   ) {}
+
   async updatePrimary(id: string, updateDto: Partial<PrimaryEducationDto>): Promise<Education> {
-  const education = await this.findOne(id);
-  
-  if (education.educationLevel !== EducationLevel.PRIMARY) {
-    throw new BadRequestException('This education record is not primary level');
+    const education = await this.findOne(id);
+    
+    if (education.educationLevel !== EducationLevel.PRIMARY) {
+      throw new BadRequestException('This education record is not primary level');
+    }
+    
+    Object.assign(education, updateDto);
+    return await this.educationRepository.save(education);
   }
-  
-  Object.assign(education, updateDto);
-  return await this.educationRepository.save(education);
-}
 
-async updateSecondary(id: string, updateDto: Partial<SecondaryEducationDto>): Promise<Education> {
-  const education = await this.findOne(id);
-  
-  if (education.educationLevel !== EducationLevel.SECONDARY) {
-    throw new BadRequestException('This education record is not secondary level');
+  async updateSecondary(id: string, updateDto: Partial<SecondaryEducationDto>): Promise<Education> {
+    const education = await this.findOne(id);
+    
+    if (education.educationLevel !== EducationLevel.SECONDARY) {
+      throw new BadRequestException('This education record is not secondary level');
+    }
+    
+    Object.assign(education, updateDto);
+    return await this.educationRepository.save(education);
   }
-  
-  Object.assign(education, updateDto);
-  return await this.educationRepository.save(education);
-}
 
-async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Promise<Education> {
-  const education = await this.findOne(id);
-  
-  if (education.educationLevel !== EducationLevel.TERTIARY) {
-    throw new BadRequestException('This education record is not tertiary level');
+  async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Promise<Education> {
+    const education = await this.findOne(id);
+    
+    if (education.educationLevel !== EducationLevel.TERTIARY) {
+      throw new BadRequestException('This education record is not tertiary level');
+    }
+    
+    Object.assign(education, updateDto);
+    return await this.educationRepository.save(education);
   }
-  
-  Object.assign(education, updateDto);
-  return await this.educationRepository.save(education);
-}
+
   // Create Primary Education
   async createPrimary(userId: string, data: PrimaryEducationDto): Promise<Education> {
-    // Validate other payer name if needed
-    if (data.whoPaidFees === FeePayer.OTHER && !data.otherPayerName) {
-      throw new BadRequestException('Please specify the payer name');
-    }
-
     const education = this.educationRepository.create({
       userId,
       educationLevel: EducationLevel.PRIMARY,
@@ -58,7 +56,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
       tuitionFees: data.tuitionFees,
       yearCompleted: data.yearCompleted,
       whoPaidFees: data.whoPaidFees,
-      otherPayerName: data.otherPayerName,
       certificateUrl: data.certificateUrl,
       isSemesterBased: false,
     });
@@ -68,10 +65,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
 
   // Create Secondary Education
   async createSecondary(userId: string, data: SecondaryEducationDto): Promise<Education> {
-    if (data.whoPaidFees === FeePayer.OTHER && !data.otherPayerName) {
-      throw new BadRequestException('Please specify the payer name');
-    }
-
     const education = this.educationRepository.create({
       userId,
       educationLevel: EducationLevel.SECONDARY,
@@ -79,7 +72,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
       tuitionFees: data.tuitionFees,
       yearCompleted: data.yearCompleted,
       whoPaidFees: data.whoPaidFees,
-      otherPayerName: data.otherPayerName,
       certificateUrl: data.certificateUrl,
       isSemesterBased: false,
     });
@@ -89,10 +81,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
 
   // Create Tertiary Education
   async createTertiary(userId: string, data: TertiaryEducationDto): Promise<Education> {
-    if (data.whoPaidFees === FeePayer.OTHER && !data.otherPayerName) {
-      throw new BadRequestException('Please specify the payer name');
-    }
-
     const education = this.educationRepository.create({
       userId,
       educationLevel: EducationLevel.TERTIARY,
@@ -100,7 +88,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
       tuitionFees: data.tuitionFees,
       yearCompleted: data.yearCompleted,
       whoPaidFees: data.whoPaidFees,
-      otherPayerName: data.otherPayerName,
       certificateUrl: data.certificateUrl,
       isSemesterBased: data.isSemesterBased !== undefined ? data.isSemesterBased : true,
     });
@@ -164,11 +151,6 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
   // Update education
   async update(id: string, updateDto: any): Promise<Education> {
     const education = await this.findOne(id);
-    
-    if (updateDto.whoPaidFees === FeePayer.OTHER && !updateDto.otherPayerName) {
-      throw new BadRequestException('Please specify the payer name');
-    }
-    
     Object.assign(education, updateDto);
     return await this.educationRepository.save(education);
   }
@@ -197,12 +179,8 @@ async updateTertiary(id: string, updateDto: Partial<TertiaryEducationDto>): Prom
     const totalFeesPaid = allEducation.reduce((sum, edu) => sum + Number(edu.tuitionFees), 0);
     
     const feePayerStats = {
-      self: allEducation.filter(e => e.whoPaidFees === FeePayer.SELF).length,
       parent: allEducation.filter(e => e.whoPaidFees === FeePayer.PARENT).length,
-      guardian: allEducation.filter(e => e.whoPaidFees === FeePayer.GUARDIAN).length,
       sponsor: allEducation.filter(e => e.whoPaidFees === FeePayer.SPONSOR).length,
-      scholarship: allEducation.filter(e => e.whoPaidFees === FeePayer.SCHOLARSHIP).length,
-      other: allEducation.filter(e => e.whoPaidFees === FeePayer.OTHER).length,
     };
 
     return {
