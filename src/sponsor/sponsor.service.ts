@@ -1,6 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Sponsor } from './entities/sponsor.entity';
 import { SponsorAllocation } from './entities/sponsor-allocation.entity';
 import { CreateSponsorDto } from './dto/create-sponsor.dto';
@@ -10,13 +15,14 @@ import { ReviewService } from 'src/application/services/review.service';
 import { UserService } from 'src/user/user.service';
 import { RankingService } from 'src/ranking/ranking.service';
 import { RankingCriteriaService } from '../ranking/services/ranking-criteria.service';
+import { User } from 'src/user/entities/user.entity';
 
 @Injectable()
 export class SponsorService {
   constructor(
     @InjectRepository(Sponsor)
     private readonly sponsorRepo: Repository<Sponsor>,
-    @InjectRepository(SponsorAllocation)   
+    @InjectRepository(SponsorAllocation)
     private readonly allocationRepo: Repository<SponsorAllocation>,
     @InjectRepository(ProfileData)
     private readonly profileRepo: Repository<ProfileData>,
@@ -27,6 +33,87 @@ export class SponsorService {
     private readonly rankingCriteriaService: RankingCriteriaService,
   ) {}
 
+  private getSponsorStatus(allocatedCount: number, requestedSlots: number) {
+    return allocatedCount >= requestedSlots
+      ? 'completed'
+      : allocatedCount > 0
+        ? 'partial'
+        : 'pending';
+  }
+
+  private getApplicantName(profile: ProfileData) {
+    return `${profile.firstName} ${profile.lastName}`.trim();
+  }
+
+  private getLogoSlug(name: string) {
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
+  private async getSponsorOrThrow(id: string) {
+    const sponsor = await this.sponsorRepo.findOne({ where: { id } });
+
+    if (!sponsor) {
+      throw new NotFoundException('Sponsor not found');
+    }
+
+    return sponsor;
+  }
+
+  private async getUsersById(userIds: string[]) {
+    const users = await this.userService.findByIds(userIds);
+    return new Map(users.map((user: User) => [user.id, user]));
+  }
+
+  private async getProfilesByUserId(userIds: string[]) {
+    if (!userIds.length) {
+      return new Map<string, ProfileData>();
+    }
+
+    const profiles = await this.profileRepo.find({
+      where: { userId: In(userIds) },
+    });
+
+    return new Map(profiles.map((profile) => [profile.userId, profile]));
+  }
+
+  private async uploadSponsorLogo(
+    name: string,
+    logoFile?: Express.Multer.File,
+  ) {
+    if (!logoFile) {
+      return {
+        logoUrl: null,
+        logoFilename: null,
+      };
+    }
+
+    const uploaded = await this.fileService.uploadImageFile(
+      logoFile,
+      'sponsors/logos',
+      this.getLogoSlug(name),
+    );
+
+    return {
+      logoUrl: uploaded.url,
+      logoFilename: uploaded.filename,
+    };
+  }
+
+  private async activateRankingCriteria(rankingCriteriaId?: string) {
+    if (!rankingCriteriaId) {
+      return false;
+    }
+
+    try {
+      await this.rankingCriteriaService.activateTemplate(rankingCriteriaId);
+      return true;
+    } catch (err) {
+      throw new BadRequestException(
+        `Failed to activate criteria: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      );
+    }
+  }
+
   private async buildApprovedApplicantPool(excludedUserIds: string[] = []) {
     await this.rankingService.refreshAllRankings().catch(() => null);
 
@@ -34,22 +121,28 @@ export class SponsorService {
       order: { score: 'DESC', firstName: 'ASC', lastName: 'ASC' },
     });
 
+    const excludedUserIdSet = new Set(excludedUserIds);
     const profiles = allProfiles.filter((profile) => {
-      const isApproved = (profile.status ?? '').trim().toLowerCase() === 'approved';
-      const isExcluded = excludedUserIds.includes(profile.userId);
+      const isApproved =
+        (profile.status ?? '').trim().toLowerCase() === 'approved';
+      const isExcluded = excludedUserIdSet.has(profile.userId);
       return isApproved && !isExcluded;
     });
+
+    const userById = await this.getUsersById(
+      profiles.map((profile) => profile.userId),
+    );
 
     const applicants = await Promise.all(
       profiles.map(async (profile) => {
         const readiness = await this.reviewService
-            .canSubmitApplication(profile.userId)
-            .catch(() => ({ completionPercentage: 0 }));
-        const user = await this.userService.findById(profile.userId);
+          .canSubmitApplication(profile.userId)
+          .catch(() => ({ completionPercentage: 0 }));
+        const user = userById.get(profile.userId);
 
         return {
           userId: profile.userId,
-          name: `${profile.firstName} ${profile.lastName}`.trim(),
+          name: this.getApplicantName(profile),
           email: user?.email ?? '',
           registrationNumber: profile.registrationNumber,
           program: 'Programme not submitted',
@@ -63,8 +156,14 @@ export class SponsorService {
 
     return applicants.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      if ((a.rank ?? Number.MAX_SAFE_INTEGER) !== (b.rank ?? Number.MAX_SAFE_INTEGER)) {
-        return (a.rank ?? Number.MAX_SAFE_INTEGER) - (b.rank ?? Number.MAX_SAFE_INTEGER);
+      if (
+        (a.rank ?? Number.MAX_SAFE_INTEGER) !==
+        (b.rank ?? Number.MAX_SAFE_INTEGER)
+      ) {
+        return (
+          (a.rank ?? Number.MAX_SAFE_INTEGER) -
+          (b.rank ?? Number.MAX_SAFE_INTEGER)
+        );
       }
       return a.name.localeCompare(b.name);
     });
@@ -78,7 +177,10 @@ export class SponsorService {
     }, new Map<string, number>());
   }
 
-  async createSponsor(createDto: CreateSponsorDto, logoFile?: Express.Multer.File) {
+  async createSponsor(
+    createDto: CreateSponsorDto,
+    logoFile?: Express.Multer.File,
+  ) {
     const existing = await this.sponsorRepo.findOne({
       where: { name: createDto.name },
     });
@@ -87,30 +189,13 @@ export class SponsorService {
       throw new ConflictException('A sponsor with this name already exists');
     }
 
-    let logoUrl: string | null = null;
-    let logoFilename: string | null = null;
-
-    if (logoFile) {
-      const uploaded = await this.fileService.uploadImageFile(
-        logoFile,
-        'sponsors/logos',
-        createDto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      );
-      logoUrl = uploaded.url;
-      logoFilename = uploaded.filename;
-    }
-
-    let isCriteriaActivated = false;
-    
-    // If rankingCriteriaId is provided, activate the criteria
-    if (createDto.rankingCriteriaId) {
-      try {
-        await this.rankingCriteriaService.activateTemplate(createDto.rankingCriteriaId);
-        isCriteriaActivated = true;
-      } catch (err) {
-        throw new BadRequestException(`Failed to activate criteria: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      }
-    }
+    const { logoUrl, logoFilename } = await this.uploadSponsorLogo(
+      createDto.name,
+      logoFile,
+    );
+    const isCriteriaActivated = await this.activateRankingCriteria(
+      createDto.rankingCriteriaId,
+    );
 
     const sponsor = await this.sponsorRepo.save(
       this.sponsorRepo.create({
@@ -124,7 +209,9 @@ export class SponsorService {
     );
 
     const existingAllocations = await this.allocationRepo.find();
-    const excludedUserIds = existingAllocations.map((allocation) => allocation.userId);
+    const excludedUserIds = existingAllocations.map(
+      (allocation) => allocation.userId,
+    );
     const pool = await this.buildApprovedApplicantPool(excludedUserIds);
     const selected = pool.slice(0, sponsor.requestedSlots);
 
@@ -162,16 +249,13 @@ export class SponsorService {
         rankingCriteriaId: sponsor.rankingCriteriaId,
         isCriteriaActivated: sponsor.isCriteriaActivated,
         allocatedCount,
-        status: allocatedCount >= sponsor.requestedSlots ? 'completed' : allocatedCount > 0 ? 'partial' : 'pending',
+        status: this.getSponsorStatus(allocatedCount, sponsor.requestedSlots),
       };
     });
   }
 
   async getSponsorById(id: string) {
-    const sponsor = await this.sponsorRepo.findOne({ where: { id } });
-    if (!sponsor) {
-      throw new NotFoundException('Sponsor not found');
-    }
+    const sponsor = await this.getSponsorOrThrow(id);
 
     const allocations = await this.allocationRepo.find({
       where: { sponsorId: id },
@@ -179,29 +263,27 @@ export class SponsorService {
     });
 
     const userIds = allocations.map((allocation) => allocation.userId);
-    const profiles = userIds.length
-      ? await this.profileRepo.find({ where: userIds.map((userId) => ({ userId })) })
-      : [];
-    const profileByUserId = new Map(profiles.map((profile) => [profile.userId, profile]));
+    const [profileByUserId, userById] = await Promise.all([
+      this.getProfilesByUserId(userIds),
+      this.getUsersById(userIds),
+    ]);
 
-    const applicants = await Promise.all(
-      allocations.map(async (allocation) => {
-        const profile = profileByUserId.get(allocation.userId);
-        const user = await this.userService.findById(allocation.userId);
+    const applicants = allocations.map((allocation) => {
+      const profile = profileByUserId.get(allocation.userId);
+      const user = userById.get(allocation.userId);
 
-        return {
-          userId: allocation.userId,
-          rank: allocation.rank,
-          score: allocation.score,
-          name: profile ? `${profile.firstName} ${profile.lastName}`.trim() : 'Unknown Applicant',
-          email: user?.email ?? '',
-          registrationNumber: profile?.registrationNumber ?? '',
-          program: 'Programme not submitted',
-          department: null,
-          yearOfStudy: null,
-        };
-      }),
-    );
+      return {
+        userId: allocation.userId,
+        rank: allocation.rank,
+        score: allocation.score,
+        name: profile ? this.getApplicantName(profile) : 'Unknown Applicant',
+        email: user?.email ?? '',
+        registrationNumber: profile?.registrationNumber ?? '',
+        program: 'Programme not submitted',
+        department: null,
+        yearOfStudy: null,
+      };
+    });
 
     return {
       id: sponsor.id,
@@ -212,16 +294,13 @@ export class SponsorService {
       rankingCriteriaId: sponsor.rankingCriteriaId,
       isCriteriaActivated: sponsor.isCriteriaActivated,
       allocatedCount: applicants.length,
-      status: applicants.length >= sponsor.requestedSlots ? 'completed' : applicants.length > 0 ? 'partial' : 'pending',
+      status: this.getSponsorStatus(applicants.length, sponsor.requestedSlots),
       applicants,
     };
   }
 
   async deleteSponsor(id: string) {
-    const sponsor = await this.sponsorRepo.findOne({ where: { id } });
-    if (!sponsor) {
-      throw new NotFoundException('Sponsor not found');
-    }
+    await this.getSponsorOrThrow(id);
 
     await this.allocationRepo.delete({ sponsorId: id });
     await this.sponsorRepo.delete(id);
