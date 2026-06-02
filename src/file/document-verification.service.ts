@@ -3,7 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VerificationLog } from '../application/entities/verification-log.entity';
 
-// Declare as any to avoid TypeScript issues
 let pdfParse: any;
 
 @Injectable()
@@ -18,11 +17,9 @@ export class DocumentVerificationService {
   private async initPdfParse() {
     if (!pdfParse) {
       try {
-        // Use require instead of import for better compatibility
         pdfParse = require('pdf-parse');
       } catch (error) {
         console.error('Failed to load pdf-parse:', error);
-        // Create a fallback function
         pdfParse = async () => ({ text: '' });
       }
     }
@@ -31,9 +28,7 @@ export class DocumentVerificationService {
   async extractTextFromPDF(fileBuffer: Buffer): Promise<string> {
     try {
       await this.initPdfParse();
-      if (!pdfParse) {
-        return '';
-      }
+      if (!pdfParse) return '';
       const data = await pdfParse(fileBuffer);
       return data.text || '';
     } catch (error) {
@@ -65,34 +60,148 @@ export class DocumentVerificationService {
     return matches / longer.length;
   }
 
-  async verifyNationalId(file: any, userData: any, userId: string): Promise<{
+  async extractNamesFromConsentForm(fileBuffer: Buffer): Promise<{
+    fatherName?: { firstName: string; lastName: string };
+    motherName?: { firstName: string; lastName: string };
+    guardianName?: { firstName: string; lastName: string };
+    extractedText: string;
+  }> {
+    const extractedText = await this.extractTextFromPDF(fileBuffer);
+    
+    const result: any = {
+      extractedText,
+      fatherName: this.extractPersonName(extractedText, 'father'),
+      motherName: this.extractPersonName(extractedText, 'mother'),
+      guardianName: this.extractPersonName(extractedText, 'guardian'),
+    };
+    
+    Object.keys(result).forEach(key => {
+      if (result[key] === undefined) delete result[key];
+    });
+    
+    return result;
+  }
+
+  private extractPersonName(text: string, personType: 'father' | 'mother' | 'guardian'): { firstName: string; lastName: string } | undefined {
+    const patterns = {
+      father: [
+        new RegExp(`Father['']?s\\s+(?:First\\s+)?Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Father['']?s\\s+Full\\s+Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Father:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Parent\\/Father\\s+Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`I,\\s*([A-Za-z]+)\\s+([A-Za-z]+),\\s+father`, 'i'),
+      ],
+      mother: [
+        new RegExp(`Mother['']?s\\s+(?:First\\s+)?Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Mother['']?s\\s+Full\\s+Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Mother:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Parent\\/Mother\\s+Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`I,\\s*([A-Za-z]+)\\s+([A-Za-z]+),\\s+mother`, 'i'),
+      ],
+      guardian: [
+        new RegExp(`Guardian['']?s\\s+(?:First\\s+)?Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Guardian['']?s\\s+Full\\s+Name:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Guardian:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`Legal\\s+Guardian:\\s*([A-Za-z]+)\\s+([A-Za-z]+)`, 'i'),
+        new RegExp(`I,\\s*([A-Za-z]+)\\s+([A-Za-z]+),\\s+guardian`, 'i'),
+      ],
+    };
+
+    const personPatterns = patterns[personType];
+    
+    for (const pattern of personPatterns) {
+      const match = text.match(pattern);
+      if (match && match[1] && match[2]) {
+        return {
+          firstName: match[1].trim(),
+          lastName: match[2].trim(),
+        };
+      }
+    }
+    
+    return undefined;
+  }
+
+  async verifyConsentForm(
+    file: any,
+    familyData: {
+      fatherFirstName?: string;
+      fatherSurname?: string;
+      motherFirstName?: string;
+      motherSurname?: string;
+      guardianFirstName?: string;
+      guardianSurname?: string;
+    },
+    userId: string
+  ): Promise<{
     isVerified: boolean;
     mismatches: string[];
     warnings: string[];
     extractedData: any;
+    matchedWith: string;
   }> {
-    const extractedText = await this.extractTextFromPDF(file.buffer);
+    const extractedNames = await this.extractNamesFromConsentForm(file.buffer);
     const mismatches: string[] = [];
     const warnings: string[] = [];
-    let isVerified = true;
+    let isVerified = false;
+    let matchedWith = '';
 
-    const extractedName = this.extractNameFromText(extractedText);
-    
-    if (userData.firstName && extractedName) {
-      const similarity = this.calculateSimilarity(userData.firstName, extractedName);
-      if (similarity < 0.7) {
-        isVerified = false;
-        mismatches.push(`First name mismatch: Expected "${userData.firstName}", Found "${extractedName}"`);
-      } else if (similarity < 0.9) {
-        warnings.push(`First name slight mismatch: Expected "${userData.firstName}", Found "${extractedName}"`);
+    // Check Father
+    if (familyData.fatherFirstName && familyData.fatherSurname && extractedNames.fatherName) {
+      const firstNameSimilarity = this.calculateSimilarity(
+        familyData.fatherFirstName,
+        extractedNames.fatherName.firstName
+      );
+      const lastNameSimilarity = this.calculateSimilarity(
+        familyData.fatherSurname,
+        extractedNames.fatherName.lastName
+      );
+      
+      if (firstNameSimilarity >= 0.7 && lastNameSimilarity >= 0.7) {
+        isVerified = true;
+        matchedWith = 'father';
       }
     }
 
-    if (userData.lastName && extractedName) {
-      const similarity = this.calculateSimilarity(userData.lastName, extractedName);
-      if (similarity < 0.7) {
-        isVerified = false;
-        mismatches.push(`Last name mismatch: Expected "${userData.lastName}", Found "${extractedName}"`);
+    // Check Mother
+    if (!isVerified && familyData.motherFirstName && familyData.motherSurname && extractedNames.motherName) {
+      const firstNameSimilarity = this.calculateSimilarity(
+        familyData.motherFirstName,
+        extractedNames.motherName.firstName
+      );
+      const lastNameSimilarity = this.calculateSimilarity(
+        familyData.motherSurname,
+        extractedNames.motherName.lastName
+      );
+      
+      if (firstNameSimilarity >= 0.7 && lastNameSimilarity >= 0.7) {
+        isVerified = true;
+        matchedWith = 'mother';
+      }
+    }
+
+    // Check Guardian
+    if (!isVerified && familyData.guardianFirstName && familyData.guardianSurname && extractedNames.guardianName) {
+      const firstNameSimilarity = this.calculateSimilarity(
+        familyData.guardianFirstName,
+        extractedNames.guardianName.firstName
+      );
+      const lastNameSimilarity = this.calculateSimilarity(
+        familyData.guardianSurname,
+        extractedNames.guardianName.lastName
+      );
+      
+      if (firstNameSimilarity >= 0.7 && lastNameSimilarity >= 0.7) {
+        isVerified = true;
+        matchedWith = 'guardian';
+      }
+    }
+
+    if (!isVerified) {
+      if (extractedNames.fatherName || extractedNames.motherName || extractedNames.guardianName) {
+        mismatches.push('The names on the consent form do not match any of the provided parent or guardian information.');
+      } else {
+        mismatches.push('Could not extract any names from the consent form. Please ensure the form is clearly filled out.');
       }
     }
 
@@ -100,103 +209,24 @@ export class DocumentVerificationService {
     try {
       const log = this.verificationLogRepository.create({
         userId,
-        documentType: 'national_id',
+        documentType: 'consent_form',
         isVerified,
         mismatches: JSON.stringify(mismatches),
         warnings: JSON.stringify(warnings),
-        userInput: JSON.stringify(userData),
-        extractedData: JSON.stringify({ extractedName }),
+        userInput: JSON.stringify(familyData),
+        extractedData: JSON.stringify(extractedNames),
       });
       await this.verificationLogRepository.save(log);
     } catch (error) {
       console.error('Failed to log verification:', error);
     }
 
-    return { isVerified, mismatches, warnings, extractedData: { extractedName } };
-  }
-
-  async verifyStudentId(file: any, userData: any, userId: string): Promise<{
-    isVerified: boolean;
-    mismatches: string[];
-    warnings: string[];
-    extractedData: any;
-  }> {
-    const extractedText = await this.extractTextFromPDF(file.buffer);
-    const mismatches: string[] = [];
-    const warnings: string[] = [];
-    let isVerified = true;
-
-    const extractedName = this.extractNameFromText(extractedText);
-    
-    if (userData.firstName && extractedName) {
-      const similarity = this.calculateSimilarity(userData.firstName, extractedName);
-      if (similarity < 0.7) {
-        isVerified = false;
-        mismatches.push(`Name mismatch on student ID: Expected "${userData.firstName}", Found "${extractedName}"`);
-      }
-    }
-
-    if (userData.registrationNumber) {
-      const extractedRegNumber = this.extractRegistrationNumberFromText(extractedText);
-      if (extractedRegNumber) {
-        const similarity = this.calculateSimilarity(userData.registrationNumber, extractedRegNumber);
-        if (similarity < 0.8) {
-          isVerified = false;
-          mismatches.push(`Registration number mismatch: Expected "${userData.registrationNumber}", Found "${extractedRegNumber}"`);
-        }
-      }
-    }
-
-    // Log verification
-    try {
-      const log = this.verificationLogRepository.create({
-        userId,
-        documentType: 'student_id',
-        isVerified,
-        mismatches: JSON.stringify(mismatches),
-        warnings: JSON.stringify(warnings),
-        userInput: JSON.stringify(userData),
-        extractedData: JSON.stringify({ extractedName }),
-      });
-      await this.verificationLogRepository.save(log);
-    } catch (error) {
-      console.error('Failed to log verification:', error);
-    }
-
-    return { isVerified, mismatches, warnings, extractedData: { extractedName } };
-  }
-
-  private extractNameFromText(text: string): string {
-    const patterns = [
-      /Name:\s*([A-Za-z\s]+)/i,
-      /Full Name:\s*([A-Za-z\s]+)/i,
-      /Student Name:\s*([A-Za-z\s]+)/i,
-      /Applicant Name:\s*([A-Za-z\s]+)/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-    return '';
-  }
-
-  private extractRegistrationNumberFromText(text: string): string {
-    const patterns = [
-      /Registration Number:\s*([A-Z0-9\-]+)/i,
-      /Student ID:\s*([A-Z0-9\-]+)/i,
-      /Reg No:\s*([A-Z0-9\-]+)/i,
-      /ID Number:\s*([A-Z0-9\-]+)/i,
-    ];
-
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
-      }
-    }
-    return '';
+    return {
+      isVerified,
+      mismatches,
+      warnings,
+      extractedData: extractedNames,
+      matchedWith,
+    };
   }
 }

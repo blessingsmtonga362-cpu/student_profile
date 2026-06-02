@@ -1,3 +1,4 @@
+// family.entity.ts
 import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
 
@@ -204,13 +205,19 @@ export class Family {
   private validatePhoneNumber(phone: string | undefined, fieldName: string): void {
     if (!phone) return;
     
-    const cleanedNumber = phone.replace(/\D/g, '');
-    const last10Digits = cleanedNumber.slice(-10);
-    const phoneRegex = /^0[89][0-9]{8}$/;
+    let cleanedNumber = phone.replace(/[\s-]/g, '');
     
-    if (!phoneRegex.test(last10Digits)) {
+    if (cleanedNumber.startsWith('+265')) {
+      cleanedNumber = cleanedNumber.substring(4);
+    }
+    
+    cleanedNumber = cleanedNumber.replace(/^0+/, '');
+    
+    const phoneRegex = /^[89][0-9]{8}$/;
+    
+    if (!phoneRegex.test(cleanedNumber)) {
       throw new BadRequestException(
-        `${fieldName} must start with 08 or 09 and be exactly 10 digits (e.g., 0888123456 or 0999123456)`
+        `${fieldName} must be a valid Malawi phone number. Enter 9 digits starting with 8 (Airtel) or 9 (TNM). Example: 888123456 or 999123456`
       );
     }
   }

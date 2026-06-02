@@ -1,14 +1,7 @@
+
 import { Injectable } from '@nestjs/common';
 import { FileService } from '../../file/file.service';
 import { DocumentVerificationService } from '../../file/document-verification.service';
-
-// Define the verification result interface
-interface VerificationResult {
-  isVerified: boolean;
-  mismatches: string[]; 
-  warnings: string[];
-  extractedData: any;
-}
 
 @Injectable()
 export class DocumentUploadService {
@@ -17,39 +10,37 @@ export class DocumentUploadService {
     private readonly verificationService: DocumentVerificationService,
   ) {}
 
-  async uploadAndVerifyDocument(
+  async uploadAndVerifyConsentForm(
     file: any,
-    type: string,
     userId: string,
-    userData: any,
-  ) {
-    let verification: VerificationResult | null = null; // Explicitly type as VerificationResult | null
-    
-    if (type === 'nationalId') {
-      verification = await this.verificationService.verifyNationalId(
-        file,
-        userData,
-        userId,
-      ) as VerificationResult; // Add type assertion
-    } else if (type === 'studentId') {
-      verification = await this.verificationService.verifyStudentId(
-        file,
-        userData,
-        userId,
-      ) as VerificationResult; // Add type assertion
+    familyData: {
+      fatherFirstName?: string;
+      fatherSurname?: string;
+      motherFirstName?: string;
+      motherSurname?: string;
+      guardianFirstName?: string;
+      guardianSurname?: string;
     }
+  ) {
+    // First verify the consent form
+    const verification = await this.verificationService.verifyConsentForm(
+      file,
+      familyData,
+      userId,
+    );
 
-    if (verification && !verification.isVerified) {
+    if (!verification.isVerified) {
       return {
         success: false,
         verification,
       };
     }
 
+    // Then upload the file
     const uploadResult = await this.fileService.uploadFile(
       file,
-      `documents/${type}s`,
-      `${type}-${userId}`,
+      'documents/consent-forms',
+      `consent-form-${userId}`,
     );
 
     return {

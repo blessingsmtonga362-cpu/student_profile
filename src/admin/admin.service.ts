@@ -338,13 +338,7 @@ export class AdminService {
 
     await this.profileRepo.save(profile);
     await this.updateSubmissionStatus(
-      userId,
-      normalizedStatus,
-      reviewComment,
-      adminId,
-    );
     await this.notifyStudent(userId, normalizedStatus, reviewComment, adminId);
-
     return {
       message: 'Application reviewed successfully',
       applicant: {
@@ -358,7 +352,8 @@ export class AdminService {
     };
   }
 
-  private async updateSubmissionStatus(
+  // Combined method to handle both submission update and notification
+  private async updateSubmissionAndNotify(
     userId: string,
     normalizedStatus: string,
     reviewComment: string | null,
@@ -381,14 +376,7 @@ export class AdminService {
         throw error;
       }
     }
-  }
 
-  private async notifyStudent(
-    userId: string,
-    normalizedStatus: string,
-    reviewComment: string | null,
-    adminId: string,
-  ) {
     if (normalizedStatus === AdminApplicationReviewStatus.APPROVED) {
       // Notify the student
       await this.notificationService.createNotification({
@@ -439,3 +427,4 @@ export class AdminService {
     });
   }
 }
+
