@@ -230,17 +230,10 @@ export class EmailService {
     });
   }
 
-  // Helper method to log email to console (for development when email is not configured)
+  // Do not log email bodies because OTP messages contain sensitive codes.
   private logEmailToConsole(options: EmailOptions): void {
-    if (this.configService.get<string>('EMAIL_DEBUG', 'false') !== 'true') {
-      this.logger.warn(
-        `Email suppressed because SMTP is not configured: ${options.subject} -> ${options.to}`,
-      );
-      return;
-    }
-
-    this.logger.log(
-      `Email preview: ${options.subject} -> ${options.to}\n${this.stripHtml(options.html)}`,
+    this.logger.warn(
+      `Email suppressed because SMTP is not configured: ${options.subject} -> ${options.to}`,
     );
   }
 

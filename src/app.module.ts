@@ -14,6 +14,7 @@ import { EmailModule } from './email/email.module';
 import { SponsorModule } from './sponsor/sponsor.module';
 import { RankingModule } from './ranking/ranking.module';
 import { PaychanguModule } from './paychangu/paychangu.module';
+import { TransferModule } from './transfer/transfer.module';
 
 const envFilePath = join(process.cwd(), '.env');
 
@@ -85,6 +86,7 @@ function validateEnv(config: Record<string, string | undefined>) {
     SponsorModule,
     RankingModule,
     PaychanguModule,
+    TransferModule,
   ],
 })
 export class AppModule implements OnModuleInit {
