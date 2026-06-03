@@ -111,6 +111,20 @@ export class StudentNotificationController {
     };
   }
 
+  // Delete all notifications (Clear all)
+  @Delete('clear-all')
+  async clearAllNotifications(@Req() req) {
+    const userId = req.user.id;
+    const result =
+      await this.notificationService.deleteAllNotifications(userId);
+
+    return {
+      success: true,
+      message: 'All notifications cleared',
+      count: result.count,
+    };
+  }
+
   // Delete a single notification
   @Delete(':notificationId')
   async deleteNotification(
@@ -123,20 +137,6 @@ export class StudentNotificationController {
     return {
       success: true,
       message: 'Notification deleted successfully',
-    };
-  }
-
-  // Delete all notifications (Clear all)
-  @Delete('clear-all')
-  async clearAllNotifications(@Req() req) {
-    const userId = req.user.id;
-    const result =
-      await this.notificationService.deleteAllNotifications(userId);
-
-    return {
-      success: true,
-      message: 'All notifications cleared',
-      count: result.count,
     };
   }
 

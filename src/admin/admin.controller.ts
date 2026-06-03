@@ -27,6 +27,29 @@ export class AdminController {
   }
 
   @Roles(Role.Admin)
+  @Get('applications')
+  async getApplications() {
+    const profiles = await this.adminService.getProfiles();
+
+    return {
+      count: profiles.length,
+      applicants: profiles.map((profile) => ({
+        id: profile.userId,
+        name: `${profile.firstName} ${profile.lastName}`.trim(),
+        registrationNumber: profile.registrationNumber,
+        program: 'Programme not submitted',
+        score: profile.score ?? 0,
+        rank: profile.rank ?? null,
+        status:
+          profile.status === ProfileReviewStatus.APPROVED ||
+          profile.status === ProfileReviewStatus.FLAGGED
+            ? profile.status
+            : ProfileReviewStatus.PENDING_REVIEW,
+      })),
+    };
+  }
+
+  @Roles(Role.Admin)
   @Get('users/:userId')
   getUserApplication(@Param('userId') userId: string) {
     return this.adminService.getUserApplication(userId);

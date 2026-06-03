@@ -80,7 +80,7 @@ export class FamilyController {
       consentForm?: Express.Multer.File[];
     },
   ) {
-    const userId = this.getUserId(req);
+    const userId = this.requireUserId(req);
 
     let deathCertificateUrl: string | undefined;
     let nationalIdUrl: string | undefined;
@@ -152,7 +152,7 @@ export class FamilyController {
 
   @Get('my-family')
   async getMyFamily(@Req() req: FamilyRequest) {
-    const userId = this.getUserId(req);
+    const userId = this.requireUserId(req);
     return await this.familyService.findByUserId(userId);
   }
 
@@ -213,7 +213,7 @@ export class FamilyController {
 
   @Delete()
   async remove(@Req() req: FamilyRequest) {
-    const userId = this.getUserId(req);
+    const userId = this.requireUserId(req);
     return await this.familyService.removeByUserId(userId);
   }
 
@@ -238,5 +238,15 @@ export class FamilyController {
 
   private getUserId(req: FamilyRequest, fallback?: string): string | undefined {
     return req.user?.userId || req.user?.id || fallback;
+  }
+
+  private requireUserId(req: FamilyRequest, fallback?: string): string {
+    const userId = this.getUserId(req, fallback);
+
+    if (!userId) {
+      throw new BadRequestException('User ID not found');
+    }
+
+    return userId;
   }
 }
