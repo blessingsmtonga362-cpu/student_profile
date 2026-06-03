@@ -1,100 +1,15 @@
-import { 
-  IsString, 
-  IsEmail, 
-  IsEnum, 
-  IsOptional, 
-  IsDateString,
-  MinLength,
-  MaxLength,
-  IsUrl,
+import {
   IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsEnum,
   Matches,
+  MaxLength,
+  IsIn,
   ValidateIf,
-  registerDecorator,
-  ValidationOptions,
-  ValidatorConstraint,
-  ValidatorConstraintInterface,
-  ValidationArguments
 } from 'class-validator';
 import { PartialType } from '@nestjs/mapped-types';
 import { MaritalStatus, Gender, Disability } from '../entities/personal_details.entity';
-
-// Validator for payment phone number
-@ValidatorConstraint({ async: false })
-export class PaymentPhoneConstraint implements ValidatorConstraintInterface {
-  validate(phoneNumber: string, args: ValidationArguments) {
-    const object = args.object as any;
-    const paymentMethod = object.paymentMethod;
-    
-    if (!phoneNumber) return true;
-    
-    const cleanedNumber = phoneNumber.replace(/\D/g, '');
-    const last10Digits = cleanedNumber.slice(-10);
-    
-    if (paymentMethod === 'tnm' || paymentMethod === 'tnm_mpamba') {
-      return /^08\d{8}$/.test(last10Digits);
-    }
-    
-    if (paymentMethod === 'airtel' || paymentMethod === 'airtel_money') {
-      return /^09\d{8}$/.test(last10Digits);
-    }
-    return true;
-  }
-
-  defaultMessage(args: ValidationArguments) {
-    const object = args.object as any;
-    const paymentMethod = object.paymentMethod;
-    
-    if (paymentMethod === 'tnm' || paymentMethod === 'tnm_mpamba') {
-      return 'TNM Mpamba number must start with 08 and be exactly 10 digits long (e.g., 0886663959)';
-    }
-    if (paymentMethod === 'airtel' || paymentMethod === 'airtel_money') {
-      return 'Airtel Money number must start with 09 and be exactly 10 digits long (e.g., 0996663959)';
-    }
-    return 'Invalid phone number format for selected payment method';
-  }
-}
-
-export function IsPaymentPhone(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
-    registerDecorator({
-      target: object.constructor,
-      propertyName: propertyName,
-      options: validationOptions,
-      constraints: [],
-      validator: PaymentPhoneConstraint,
-    });
-  };
-}
-
-// Validator for general phone number (10 digits, starts with 08 or 09)
-@ValidatorConstraint({ async: false })
-export class MalawiPhoneConstraint implements ValidatorConstraintInterface {
-  validate(phoneNumber: string, args: ValidationArguments) {
-    if (!phoneNumber) return false;
-    
-    const cleanedNumber = phoneNumber.replace(/\D/g, '');
-    const last10Digits = cleanedNumber.slice(-10);
-    
-    return /^0[89]\d{8}$/.test(last10Digits);
-  }
-
-  defaultMessage(args: ValidationArguments) {
-    return 'Phone number must start with 08 or 09 and be exactly 10 digits long (e.g., 0888123456 or 0999123456)';
-  }
-}
-
-export function IsMalawiPhone(validationOptions?: ValidationOptions) {
-  return function (object: Object, propertyName: string) {
-    registerDecorator({
-      target: object.constructor,
-      propertyName: propertyName,
-      options: validationOptions,
-      constraints: [],
-      validator: MalawiPhoneConstraint,
-    });
-  };
-}
 
 export enum PaymentMethod {
   AIRTEL_MONEY = 'airtel',
@@ -103,62 +18,83 @@ export enum PaymentMethod {
   STANDARD_BANK = 'standard',
 }
 
+/**
+ * Malawi phone numbers in international format: +265 followed by 9 digits starting with 8 or 9.
+ * Matches frontend rule: /^\+265[89]\d{8}$/
+ */
+const MALAWI_PHONE_REGEX = /^\+265[89]\d{8}$/;
+const MALAWI_PHONE_MESSAGE = 'Enter a valid Malawi number (e.g. +265991234567).';
+
+/**
+ * National ID: exactly 8 uppercase alphanumeric characters.
+ * Matches frontend rule: /^[A-Z0-9]{8}$/
+ */
+const NATIONAL_ID_REGEX = /^[A-Z0-9]{8}$/;
+const NATIONAL_ID_MESSAGE = 'Enter exactly 8 uppercase letters or numbers.';
+
 export class CreatePersonalDetailDto {
+  @IsNotEmpty({ message: 'First name is required.' })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
   @MaxLength(15)
   firstName: string;
 
+  @IsNotEmpty({ message: 'Surname is required.' })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
   @MaxLength(15)
   lastName: string;
 
-  @IsMalawiPhone()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: 'Phone number is required.' })
+  @Matches(MALAWI_PHONE_REGEX, { message: MALAWI_PHONE_MESSAGE })
   phoneNumber: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(5)
-  @MaxLength(10)
+  @IsNotEmpty({ message: 'National ID number is required.' })
+  @Matches(NATIONAL_ID_REGEX, { message: NATIONAL_ID_MESSAGE })
   nationalIdNumber: string;
 
+  @IsNotEmpty({ message: 'Home district is required.' })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
   @MaxLength(20)
   homeDistrict: string;
 
+  @IsNotEmpty({ message: 'Traditional Authority is required.' })
   @IsString()
-  @IsNotEmpty()
-  @MinLength(2)
   @MaxLength(20)
   traditionalAuthority: string;
 
+  @IsNotEmpty({ message: 'Physical address is required.' })
   @IsString()
-  @IsNotEmpty()
   physicalAddress: string;
 
-  @IsDateString()
-  @IsNotEmpty()
+  /**
+   * Date of birth — must be a valid ISO date string and the applicant must be
+   * at least 12 years old (mirrors the frontend getDateInputMaxForAge(12) rule).
+   */
+  @IsNotEmpty({ message: 'Date of birth is required.' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date of birth must be in YYYY-MM-DD format.' })
   dateOfBirth: Date;
 
+  @IsNotEmpty({ message: 'Registration number is required.' })
   @IsString()
-  @IsNotEmpty()
-  @Matches(/^[A-Z0-9]{6,20}$/i, {
-    message: 'Registration number must be alphanumeric and 6-20 characters long'
-  })
+  @MaxLength(15)
   registrationNumber: string;
+
+  @IsNotEmpty({ message: 'Marital status is required.' })
+  @IsIn(['Single', 'Married', 'Divorced'], {
+    message: 'Marital status must be Single, Married, or Divorced.',
+  })
+  maritalStatus: MaritalStatus;
+
+  @IsNotEmpty({ message: 'Gender is required.' })
+  @IsIn(['Male', 'Female'], { message: 'Gender must be Male or Female.' })
+  gender: Gender;
 
   @IsOptional()
   @IsEnum(Disability)
   disability?: Disability;
 
+  // Document URLs are set internally after upload — not validated from the client
   @IsOptional()
-  @IsUrl()
+  @IsString()
   studentIdPdfUrl?: string;
 
   @IsOptional()
@@ -166,45 +102,57 @@ export class CreatePersonalDetailDto {
   studentIdFilename?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
   nationalIdPdfUrl?: string;
 
   @IsOptional()
   @IsString()
   nationalIdFilename?: string;
 
-  @IsEnum(MaritalStatus)
-  @IsNotEmpty()
-  maritalStatus: MaritalStatus;
-
-  @IsEnum(Gender)
-  @IsNotEmpty()
-  gender: Gender;
+  // ── Payment details ────────────────────────────────────────────────────────
 
   @IsOptional()
-  @IsString()
-  paymentBranch?: string;
-
-  @IsOptional()
-  @IsEnum(PaymentMethod)
+  @IsEnum(PaymentMethod, {
+    message: 'Payment method must be airtel, tnm, national, or standard.',
+  })
   paymentMethod?: PaymentMethod;
 
-  @ValidateIf(o => o.paymentMethod === PaymentMethod.AIRTEL_MONEY || o.paymentMethod === PaymentMethod.TNM_MPAMBA)
-  @IsPaymentPhone()
-  @IsString()
+  /**
+   * Mobile money phone — required when payment method is Airtel or TNM.
+   * Must be a valid Malawi number.
+   */
+  @ValidateIf((o) => o.paymentMethod === PaymentMethod.AIRTEL_MONEY || o.paymentMethod === PaymentMethod.TNM_MPAMBA)
+  @IsNotEmpty({ message: 'Payment phone number is required for mobile money.' })
+  @Matches(MALAWI_PHONE_REGEX, { message: MALAWI_PHONE_MESSAGE })
   paymentPhoneNumber?: string;
 
-  @IsOptional()
+  /**
+   * Account name — required when a payment method is provided.
+   */
+  @ValidateIf((o) => !!o.paymentMethod)
+  @IsNotEmpty({ message: 'Account name is required.' })
   @IsString()
-  bankName?: string;
+  @MaxLength(20)
+  accountName?: string;
 
-  @IsOptional()
+  /**
+   * Bank account number — required when payment method is National Bank or Standard Bank.
+   */
+  @ValidateIf((o) => o.paymentMethod === PaymentMethod.NATIONAL_BANK || o.paymentMethod === PaymentMethod.STANDARD_BANK)
+  @IsNotEmpty({ message: 'Bank account number is required for bank transfers.' })
   @IsString()
+  @MaxLength(15)
   bankAccount?: string;
 
   @IsOptional()
   @IsString()
-  accountName?: string;
+  @MaxLength(20)
+  bankName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  paymentBranch?: string;
 }
 
 export class UpdatePersonalDetailDto extends PartialType(CreatePersonalDetailDto) {}
@@ -226,20 +174,22 @@ export class UpdatePaymentDetailsDto {
   @IsEnum(PaymentMethod)
   paymentMethod?: PaymentMethod;
 
-  @ValidateIf(o => o.paymentMethod === PaymentMethod.AIRTEL_MONEY || o.paymentMethod === PaymentMethod.TNM_MPAMBA)
-  @IsPaymentPhone()
-  @IsString()
+  @IsOptional()
+  @Matches(MALAWI_PHONE_REGEX, { message: MALAWI_PHONE_MESSAGE })
   paymentPhoneNumber?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   bankName?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(15)
   bankAccount?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   accountName?: string;
 }
