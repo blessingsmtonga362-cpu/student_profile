@@ -89,7 +89,7 @@ export class PaymentsService {
     );
 
     if (intent) {
-      intent.status = this.toIntentStatus(verification.status);
+      this.updateIntentStatus(intent, this.toIntentStatus(verification.status));
       intent.rawResponse = verification.raw;
       intent.verifiedAt = new Date();
       await this.paychanguIntentRepository.save(intent);
@@ -118,7 +118,7 @@ export class PaymentsService {
       return null;
     }
 
-    intent.status = this.toIntentStatus(payload.status);
+    this.updateIntentStatus(intent, this.toIntentStatus(payload.status));
     intent.rawResponse = payload.raw;
     intent.verifiedAt = new Date();
 
@@ -176,5 +176,22 @@ export class PaymentsService {
       default:
         return PaychanguIntentStatus.PENDING;
     }
+  }
+
+  private updateIntentStatus(
+    intent: PaychanguPaymentIntent,
+    nextStatus: PaychanguIntentStatus,
+  ): void {
+    if (
+      intent.status === PaychanguIntentStatus.SUCCESS &&
+      nextStatus === PaychanguIntentStatus.PENDING
+    ) {
+      this.logger.warn(
+        `Ignoring PayChangu status downgrade from SUCCESS to PENDING for intent ${intent.id}.`,
+      );
+      return;
+    }
+
+    intent.status = nextStatus;
   }
 }
