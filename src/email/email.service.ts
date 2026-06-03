@@ -233,13 +233,13 @@ export class EmailService {
   // Helper method to log email to console (for development when email is not configured)
   private logEmailToConsole(options: EmailOptions): void {
     if (this.configService.get<string>('EMAIL_DEBUG', 'false') !== 'true') {
-      this.logger.debug(
+      this.logger.warn(
         `Email suppressed because SMTP is not configured: ${options.subject} -> ${options.to}`,
       );
       return;
     }
 
-    this.logger.debug(
+    this.logger.log(
       `Email preview: ${options.subject} -> ${options.to}\n${this.stripHtml(options.html)}`,
     );
   }

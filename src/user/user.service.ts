@@ -46,7 +46,7 @@ export class UserService {
 
     const user = this.userRepository.create({
       ...createUserDto,
-      university: createUserDto.university ?? 'unima',
+      university: 'unima',
       password: hashedPassword,
       role: Role.User,
       isEmailVerified: true, // Direct creation - already verified
@@ -75,7 +75,7 @@ export class UserService {
 
     const user = this.userRepository.create({
       ...createUserDto,
-      university: createUserDto.university ?? 'unima',
+      university: 'unima',
       password: hashedPassword,
       role: Role.User,
       otp: otp,
@@ -111,7 +111,7 @@ export class UserService {
 
     const user = this.userRepository.create({
       ...createUser,
-      university: createUser.university ?? 'unima',
+      university: 'unima',
       password: hashedPassword,
       role: Role.User,
       otp: otp,

@@ -36,24 +36,10 @@ export class CreateUserDto {
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()
-  @IsNotEmpty({ message: 'registrationNumber should not be empty' })
-  registrationNumber!: string;
-
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
-  @IsString()
   @IsNotEmpty({ message: 'password should not be empty' })
   @MinLength(8, { message: 'Password must be at least 8 characters.' })
   @Matches(/[A-Z]/, { message: 'Password must contain at least one uppercase letter.' })
   @Matches(/[0-9]/, { message: 'Password must contain at least one number.' })
   @Matches(/[^A-Za-z0-9]/, { message: 'Password must contain at least one symbol.' })
   password!: string;
-
-  @Transform(({ value }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
-  @IsString()
-  @IsNotEmpty({ message: 'university should not be empty' })
-  university!: string;
 }
