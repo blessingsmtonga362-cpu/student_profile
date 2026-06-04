@@ -16,9 +16,11 @@ import { RankingModule } from './ranking/ranking.module';
 import { PaychanguModule } from './paychangu/paychangu.module';
 import { TransferModule } from './transfer/transfer.module';
 
+// Only check for .env file in development, not in production
+const isProduction = process.env.NODE_ENV === 'production';
 const envFilePath = join(process.cwd(), '.env');
 
-if (!existsSync(envFilePath)) {
+if (!isProduction && !existsSync(envFilePath)) {
   throw new Error(
     `Missing .env file at ${envFilePath}. Create it from .env.example before starting the application.`,
   );
@@ -41,7 +43,7 @@ function validateEnv(config: Record<string, string | undefined>) {
 
   if (missingVars.length > 0) {
     throw new Error(
-      `Missing required environment variables: ${missingVars.join(', ')}. Check your .env file.`,
+      `Missing required environment variables: ${missingVars.join(', ')}. Check your .env file or Render environment variables.`,
     );
   }
 
@@ -59,8 +61,10 @@ function validateEnv(config: Record<string, string | undefined>) {
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath,
+      // Only use .env file in development
+      envFilePath: isProduction ? undefined : envFilePath,
       validate: validateEnv,
+      ignoreEnvFile: isProduction, // Don't load .env file in production
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -70,10 +74,11 @@ function validateEnv(config: Record<string, string | undefined>) {
         port: Number(configService.get<string>('DB_PORT', '5432')),
         username: configService.get<string>('DB_USERNAME', 'blessings'),
         password: configService.get<string>('DB_PASSWORD', '2745'),
-        database: configService.get<string>('DB_NAME', 'student_profile'), //
+        database: configService.get<string>('DB_NAME', 'student_profile'),
         autoLoadEntities: true,
         synchronize: configService.get<string>('DB_SYNC', 'true') === 'true',
         logging: configService.get<string>('DB_LOGGING', 'false') === 'true',
+        ssl: isProduction ? { rejectUnauthorized: false } : false, // Add SSL for Neon in production
       }),
     }),
     UserModule,

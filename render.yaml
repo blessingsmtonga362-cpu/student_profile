@@ -12,7 +12,20 @@ services:
         value: --max-old-space-size=512
       - key: PORT
         value: 10000
-      - key: DATABASE_URL
+      # Database configuration - matches your app.module.ts
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: DB_SYNC
+        value: "false"
+      - key: DB_LOGGING
+        value: "false"
