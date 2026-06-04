@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RankingController } from './ranking.controller';
 import { RankingService } from './ranking.service';
+import { RankingCriteriaService } from './services/ranking-criteria.service';
 
 describe('RankingController', () => {
   let controller: RankingController;
@@ -8,7 +9,16 @@ describe('RankingController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [RankingController],
-      providers: [RankingService],
+      providers: [
+        {
+          provide: RankingService,
+          useValue: {},
+        },
+        {
+          provide: RankingCriteriaService,
+          useValue: {},
+        },
+      ],
     }).compile();
 
     controller = module.get<RankingController>(RankingController);
