@@ -81,24 +81,24 @@ export class ApplicationSubmissionService {
         const student = await this.userService.findById(userId);
         const studentName = student ? `${student.firstName} ${student.lastName}` : 'A student';
 
-        // Send notification to STUDENT
+        // Send notification to STUDENT (correct role)
         await this.notificationService.createNotification({
           userId: userId,
           userRole: UserRole.STUDENT,
-          title: '✅ Application Submitted Successfully!',
+          title: 'Application Submitted Successfully!',
           message: `Your application (${applicationReference}) has been submitted successfully. We will review it and get back to you.`,
           type: NotificationType.APPLICATION_SUBMITTED,
           priority: NotificationPriority.HIGH,
           metadata: { applicationReference, submittedAt: new Date() },
         });
 
-        // Send notification to ALL ADMINS
+        // Send notification to ALL ADMINS (correct role)
         const admins = await this.userService.findAllAdmins();
         for (const admin of admins) {
           await this.notificationService.createNotification({
             userId: admin.id,
             userRole: UserRole.ADMIN,
-            title: '📝 New Application Submitted',
+            title: 'New Application Submitted',
             message: `${studentName} has submitted a new application (${applicationReference}). Please review it.`,
             type: NotificationType.APPLICATION_SUBMITTED,
             priority: NotificationPriority.HIGH,

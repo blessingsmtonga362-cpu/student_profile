@@ -1,17 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PersonalDetails, MaritalStatus, Gender, Disability } from '../entities/personal_details.entity';
 import { CreatePersonalDetailDto, UpdatePersonalDetailDto, UpdatePaymentDetailsDto } from '../dto/create_personal_details.dto';
-import { AdminService } from 'src/admin/admin.service';
 
 @Injectable()
 export class PersonalDetailService {
   constructor(
     @InjectRepository(PersonalDetails)
     private personalDetailRepository: Repository<PersonalDetails>,
-    @Inject(forwardRef(() => AdminService))
-    private readonly adminService: AdminService
+    // Removed AdminService dependency to break circular dependency
   ) {}
 
   // Validate main phone number (required field)
@@ -113,7 +111,7 @@ export class PersonalDetailService {
     });
 
     const saved = await this.personalDetailRepository.save(personalDetail);
-    await this.adminService.syncProfile(saved);
+    // Removed adminService.syncProfile call - can be handled by an event or separate service
     return saved;
   }
 

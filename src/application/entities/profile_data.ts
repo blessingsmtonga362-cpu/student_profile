@@ -1,8 +1,8 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from "typeorm";
 
 @Entity('profile_data')
 export class ProfileData {
- @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn('uuid')
   id!: string;
 
   @Column()
@@ -17,7 +17,7 @@ export class ProfileData {
   @Column()
   registrationNumber!: string;
 
-  @Column({default:'Pending'})
+  @Column({ default: 'Pending' })
   status!: string;
 
   @Column({ nullable: true })
@@ -44,5 +44,19 @@ export class ProfileData {
   @Column({ type: 'timestamp', nullable: true })
   scoreUpdatedAt!: Date | null;
 
-}
+  // ADD THESE MISSING FIELDS:
+  @Column({ name: 'program_of_study', nullable: true, default: '' })
+  programOfStudy!: string;
 
+  @Column({ nullable: true, default: '' })
+  department!: string;
+
+  @Column({ name: 'year_of_study', nullable: true, type: 'integer' })
+  yearOfStudy!: number | null;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt!: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt!: Date;
+}
