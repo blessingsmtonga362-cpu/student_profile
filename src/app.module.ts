@@ -101,12 +101,17 @@ export class AppModule implements OnModuleInit {
     private emailService: EmailService, // Add EmailService here
   ) {
     console.log('🚀 AppModule initializing...');
+    console.log('📧 EmailService injected:', !!this.emailService);
     // Force EmailService to initialize
     this.emailService; // Reference to ensure it's loaded
   }
 
   async onModuleInit() {
     try {
+      // Force EmailService initialization
+      await this.emailService; // This will trigger initialization
+      console.log('✅ EmailService initialized successfully');
+      
       await this.userService.createAdmin();
       console.log('✅ Admin user seeded successfully');
     } catch (error) {

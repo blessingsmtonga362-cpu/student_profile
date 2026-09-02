@@ -15,6 +15,7 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private configService: ConfigService) {
+    console.log('🚀🚀🚀 EMAIL SERVICE CONSTRUCTOR CALLED! 🚀🚀🚀');
     this.initializeTransporter();
   }
 
@@ -48,7 +49,6 @@ export class EmailService {
         tls: {
           rejectUnauthorized: false,
         },
-        // Add timeout to prevent hanging
         connectionTimeout: 10000,
         greetingTimeout: 10000,
         socketTimeout: 10000,
@@ -74,14 +74,13 @@ export class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string }> {
-    // Log the email attempt
     this.logger.log(`📧 Attempting to send email to: ${options.to}`);
     this.logger.log(`📧 Subject: ${options.subject}`);
     
     if (!this.transporter) {
       this.logger.warn(`⚠️ No transporter - logging email to console: ${options.subject} -> ${options.to}`);
       this.logEmailToConsole(options);
-      return { success: true }; // Return success for development
+      return { success: true };
     }
 
     try {
@@ -101,7 +100,6 @@ export class EmailService {
     } catch (error) {
       this.logger.error(`❌ Failed to send email to ${options.to}: ${error.message}`);
       this.logger.error(`❌ Error details: ${JSON.stringify(error)}`);
-      // Fallback to console logging
       this.logEmailToConsole(options);
       throw error;
     }
