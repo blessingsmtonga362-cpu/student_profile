@@ -4,26 +4,26 @@ import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { EmailService } from './email/email.service'; // Add this import
+import { EmailService } from './email/email.service'; // ← MUST HAVE THIS
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   
-  // FORCE EmailService to initialize BEFORE anything else
+  // FORCE EmailService to initialize
   console.log('🚀 Forcing EmailService initialization...');
   try {
     const emailService = app.get(EmailService);
     console.log('✅ EmailService initialized successfully');
     
-    // Verify email service is working by checking config
+    // Verify config
     const configService = app.get(ConfigService);
     const smtpUser = configService.get('SMTP_USER');
     const smtpPassword = configService.get('SMTP_PASSWORD');
     console.log('📧 SMTP_USER:', smtpUser || 'NOT SET');
     console.log('📧 SMTP_PASSWORD:', smtpPassword ? '✅ SET' : '❌ NOT SET');
     
-    // Force email service to verify connection
-    await emailService; // Reference to ensure it's fully initialized
+    // Force the service to initialize by accessing it
+    await emailService;
   } catch (error) {
     console.error('❌ Failed to initialize EmailService:', error.message);
   }
