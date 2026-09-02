@@ -1,13 +1,33 @@
-
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { EmailService } from './email/email.service'; // Add this import
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  
+  // FORCE EmailService to initialize BEFORE anything else
+  console.log('🚀 Forcing EmailService initialization...');
+  try {
+    const emailService = app.get(EmailService);
+    console.log('✅ EmailService initialized successfully');
+    
+    // Verify email service is working by checking config
+    const configService = app.get(ConfigService);
+    const smtpUser = configService.get('SMTP_USER');
+    const smtpPassword = configService.get('SMTP_PASSWORD');
+    console.log('📧 SMTP_USER:', smtpUser || 'NOT SET');
+    console.log('📧 SMTP_PASSWORD:', smtpPassword ? '✅ SET' : '❌ NOT SET');
+    
+    // Force email service to verify connection
+    await emailService; // Reference to ensure it's fully initialized
+  } catch (error) {
+    console.error('❌ Failed to initialize EmailService:', error.message);
+  }
+  
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -22,7 +42,6 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
-  
   
   app.enableCors({
     origin: true, 

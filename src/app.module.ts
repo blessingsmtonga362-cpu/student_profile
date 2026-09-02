@@ -11,7 +11,6 @@ import { AdminModule } from './admin/admin.module';
 import { UserService } from './user/user.service';
 import { NotificationModule } from './notification/module/notification.module';
 import { EmailModule } from './email/email.module';
-import { EmailService } from './email/email.service'; // Add this import
 import { SponsorModule } from './sponsor/sponsor.module';
 import { RankingModule } from './ranking/ranking.module';
 import { PaychanguModule } from './paychangu/paychangu.module';
@@ -96,24 +95,11 @@ function validateEnv(config: Record<string, string | undefined>) {
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(
-    private userService: UserService,
-    private emailService: EmailService, // Add EmailService here
-  ) {
-    console.log('🚀 AppModule initializing...');
-    console.log('📧 EmailService injected:', !!this.emailService);
-    // Force EmailService to initialize
-    this.emailService; // Reference to ensure it's loaded
-  }
+  constructor(private userService: UserService) {}
 
   async onModuleInit() {
     try {
-      // Force EmailService initialization
-      await this.emailService; // This will trigger initialization
-      console.log('✅ EmailService initialized successfully');
-      
       await this.userService.createAdmin();
-      console.log('✅ Admin user seeded successfully');
     } catch (error) {
       console.error(
         'Failed to seed admin user:',
