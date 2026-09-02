@@ -15,33 +15,73 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private configService: ConfigService) {
+    this.initializeTransporter();
+  }
+
+  private initializeTransporter() {
     const smtpUser = this.configService.get('SMTP_USER');
     const smtpPassword = this.configService.get('SMTP_PASSWORD');
+    const smtpHost = this.configService.get('SMTP_HOST');
+    const smtpPort = this.configService.get('SMTP_PORT');
+    
+    // Debug: Log all config values
+    this.logger.log('📧 ===== EMAIL CONFIGURATION DEBUG =====');
+    this.logger.log(`SMTP_HOST: ${smtpHost || 'NOT SET'}`);
+    this.logger.log(`SMTP_PORT: ${smtpPort || 'NOT SET'}`);
+    this.logger.log(`SMTP_USER: ${smtpUser || 'NOT SET'}`);
+    this.logger.log(`SMTP_PASSWORD: ${smtpPassword ? '✅ SET (length: ' + smtpPassword.length + ')' : '❌ NOT SET'}`);
     
     if (!smtpUser || !smtpPassword) {
-      this.logger.warn('Email credentials not configured. Email sending will be disabled.');
+      this.logger.warn('⚠️ Email credentials not configured. Email sending will be disabled.');
       return;
     }
     
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get('SMTP_HOST', 'smtp.gmail.com'),
-      port: this.configService.get('SMTP_PORT', 587),
-      secure: false,
-      auth: {
-        user: smtpUser,
-        pass: smtpPassword,
-      },
-    });
-    
-    this.logger.log('Email service initialized');
+    try {
+      this.transporter = nodemailer.createTransport({
+        host: smtpHost || 'smtp.gmail.com',
+        port: parseInt(smtpPort as string) || 587,
+        secure: false,
+        auth: {
+          user: smtpUser,
+          pass: smtpPassword,
+        },
+        tls: {
+          rejectUnauthorized: false,
+        },
+        // Add timeout to prevent hanging
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 10000,
+      });
+      
+      // Verify connection
+      this.verifyConnection();
+      this.logger.log('✅ Email service initialized successfully');
+    } catch (error) {
+      this.logger.error(`❌ Failed to initialize email service: ${error.message}`);
+    }
   }
 
-  // Generic method to send any email
+  private async verifyConnection() {
+    try {
+      if (this.transporter) {
+        await this.transporter.verify();
+        this.logger.log('✅ SMTP connection verified successfully');
+      }
+    } catch (error) {
+      this.logger.error(`❌ SMTP connection verification failed: ${error.message}`);
+    }
+  }
+
   async sendEmail(options: EmailOptions): Promise<{ success: boolean; messageId?: string }> {
+    // Log the email attempt
+    this.logger.log(`📧 Attempting to send email to: ${options.to}`);
+    this.logger.log(`📧 Subject: ${options.subject}`);
+    
     if (!this.transporter) {
-      // Fallback to console logging if email not configured
+      this.logger.warn(`⚠️ No transporter - logging email to console: ${options.subject} -> ${options.to}`);
       this.logEmailToConsole(options);
-      return { success: true }; // Consider as success for development
+      return { success: true }; // Return success for development
     }
 
     try {
@@ -53,41 +93,59 @@ export class EmailService {
         text: options.text || this.stripHtml(options.html),
       };
 
+      this.logger.log(`📧 Sending email via SMTP to ${options.to}...`);
       const info = await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Email sent to ${options.to}, Subject: ${options.subject}, Message ID: ${info.messageId}`);
+      this.logger.log(`✅ Email sent successfully to ${options.to}`);
+      this.logger.log(`📧 Message ID: ${info.messageId}`);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}: ${error.message}`);
+      this.logger.error(`❌ Failed to send email to ${options.to}: ${error.message}`);
+      this.logger.error(`❌ Error details: ${JSON.stringify(error)}`);
       // Fallback to console logging
       this.logEmailToConsole(options);
       throw error;
     }
   }
 
-  // Send OTP verification email
   async sendOtpEmail(to: string, name: string, otp: string) {
+    this.logger.log(`🔐 Generating OTP email for: ${to}`);
+    this.logger.log(`🔐 OTP Code: ${otp}`);
+    
     const safeName = this.escapeHtml(name);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
+        <div style="background-color: #1e3a5f; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
           <h2 style="color: white; margin: 0;">Mthandizi Student Portal</h2>
         </div>
-        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
           <h2>Welcome, ${safeName}!</h2>
           <p>Use the following verification code to complete your registration:</p>
           <div style="text-align: center; margin: 30px 0;">
-            <div style="font-size: 32px; font-weight: bold; letter-spacing: 10px; background: #f3f4f6; padding: 15px; border-radius: 10px;">
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 10px; background: #f3f4f6; padding: 15px; border-radius: 10px; border: 2px dashed #1e3a5f;">
               ${otp}
             </div>
           </div>
           <p><strong>⏰ This code will expire in 10 minutes.</strong></p>
+          <p>If you didn't request this, please ignore this email.</p>
           <hr style="margin: 20px 0;">
           <p style="color: #6b7280; font-size: 12px;">This is an automated message, please do not reply.</p>
         </div>
       </div>
     `;
 
-    return this.sendEmail({ to, subject: 'Your Verification Code - Mthandizi Student Portal', html });
+    const result = await this.sendEmail({ 
+      to, 
+      subject: '🔐 Your Verification Code - Mthandizi Student Portal', 
+      html 
+    });
+    
+    if (result.success) {
+      this.logger.log(`✅ OTP email sent successfully to ${to}`);
+    } else {
+      this.logger.warn(`⚠️ OTP email may not have been sent to ${to}, check logs above`);
+    }
+    
+    return result;
   }
 
   // Send application submission confirmation to student
@@ -95,10 +153,10 @@ export class EmailService {
     const safeStudentName = this.escapeHtml(studentName);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
+        <div style="background-color: #1e3a5f; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
           <h2 style="color: white; margin: 0;">Mthandizi Student Portal</h2>
         </div>
-        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
           <div style="text-align: center; margin-bottom: 20px;">
             <div style="background-color: #4caf50; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
               <span style="color: white; font-size: 30px;">✓</span>
@@ -132,10 +190,10 @@ export class EmailService {
     const safeStudentName = this.escapeHtml(studentName);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
+        <div style="background-color: #1e3a5f; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
           <h2 style="color: white; margin: 0;">Mthandizi Admin Portal</h2>
         </div>
-        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
           <div style="text-align: center; margin-bottom: 20px;">
             <div style="background-color: #ff9800; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
               <span style="color: white; font-size: 30px;">📝</span>
@@ -199,10 +257,10 @@ export class EmailService {
 
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
+        <div style="background-color: #1e3a5f; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
           <h2 style="color: white; margin: 0;">Mthandizi Student Portal</h2>
         </div>
-        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
           <div style="text-align: center; margin-bottom: 20px;">
             <div style="background-color: ${statusColors[status] || '#6b7280'}; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;">
               <span style="color: white; font-size: 30px;">${status === 'approved' ? '✓' : status === 'rejected' ? '✗' : '⏳'}</span>
@@ -230,14 +288,16 @@ export class EmailService {
     });
   }
 
-  // Do not log email bodies because OTP messages contain sensitive codes.
   private logEmailToConsole(options: EmailOptions): void {
-    this.logger.warn(
-      `Email suppressed because SMTP is not configured: ${options.subject} -> ${options.to}`,
-    );
+    // Extract OTP from HTML if present
+    const otpMatch = options.html.match(/>(\d{6})<\/div>/);
+    const otp = otpMatch ? otpMatch[1] : 'NO_OTP_FOUND';
+    
+    this.logger.warn(`📝 Email suppressed (SMTP not configured): ${options.subject} -> ${options.to}`);
+    this.logger.log(`🔐 🔐 🔐 OTP CODE FOR ${options.to}: ${otp} 🔐 🔐 🔐`);
+    this.logger.log(`📝 Email content would have been sent to: ${options.to}`);
   }
 
-  // Helper method to strip HTML tags for plain text version
   private stripHtml(html: string): string {
     return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
