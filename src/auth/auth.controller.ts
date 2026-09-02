@@ -6,6 +6,7 @@ import { Public } from './metadata';
 import { UserService } from '../user/user.service';
 import { CreateUserDto } from '../user/dto/create-user.dto';
 import { SendOtpDto, VerifyOtpDto } from './dto/otp.dto';
+import { EmailService } from '../email/email.service'; // Add this import
 
 @Controller('auth')
 export class AuthController {
@@ -13,7 +14,12 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly otpService: OtpService,
     private readonly userService: UserService,
-  ) {}
+    private readonly emailService: EmailService, // Add this
+  ) {
+    console.log('✅ AuthController initialized with EmailService');
+    // Force EmailService initialization
+    this.emailService;
+  }
 
   @Public()
   @Post('register')
@@ -74,6 +80,16 @@ export class AuthController {
     return {
       success: true,
       verified,
+    };
+  }
+
+  // Add test endpoint
+  @Public()
+  @Get('email-status')
+  async emailStatus() {
+    return { 
+      status: 'Email service is available',
+      timestamp: new Date().toISOString()
     };
   }
 }
