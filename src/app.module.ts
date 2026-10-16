@@ -106,5 +106,14 @@ export class AppModule implements OnModuleInit {
         error instanceof Error ? error.message : error,
       );
     }
+
+    try {
+      await this.userService.createUser();
+    } catch (error) {
+      console.error(
+        'Failed to seed sample user:',
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 }

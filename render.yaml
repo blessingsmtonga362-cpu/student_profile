@@ -33,6 +33,16 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
+      - key: USER_FIRST_NAME
+        sync: false
+      - key: USER_LAST_NAME
+        sync: false
+      - key: USER_EMAIL
+        sync: false
+      - key: USER_PASSWORD
+        sync: false
+      - key: USER_UNIVERSITY
+        sync: false
       - key: DB_SYNC
         value: "false"
       - key: DB_LOGGING

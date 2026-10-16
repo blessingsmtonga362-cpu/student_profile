@@ -343,9 +343,7 @@ export class UserService {
   }
 
   // ========== CREATE ADMIN USER (FOR SEEDING) ==========
-
-  ///////////////////////////////
-  async createuser() {
+  async createAdmin() {
     const existingAdmin = await this.userRepository.findOneBy({
       email: this.configService.get<string>(
         'ADMIN_EMAIL',
@@ -364,21 +362,93 @@ export class UserService {
     );
 
     const user = this.userRepository.create({
-      firstName: this.configService.get<string>('USER_FIRST_NAME', 'blessings'),
-      lastName: this.configService.get<string>('USER_LAST_NAME', 'network'),
+      firstName: this.configService.get<string>(
+        'ADMIN_FIRST_NAME',
+        'blessings',
+      ),
+      lastName: this.configService.get<string>('ADMIN_LAST_NAME', 'network'),
       email: this.configService.get<string>(
-        'FIRST_EMAIL',
-        'blessingsmtonga362@gmail.com',
+        'ADMIN_EMAIL',
+        'blessings@unima.ac.mw',
       ),
       password: hashedPassword,
-      university: this.configService.get<string>('USERZ_UNIVERSITY', 'chanco'),
-      role: Role.User,
+      university: this.configService.get<string>('ADMIN_UNIVERSITY', 'chanco'),
+      role: Role.Admin,
       isEmailVerified: true,
     });
 
     const savedAdmin = await this.userRepository.save(user);
     this.logger.debug('Admin user created successfully');
     return savedAdmin;
+  }
+
+  // ========== CREATE SAMPLE USER (FOR SEEDING) ==========
+  async createUser(): Promise<User | null> {
+    const firstName = this.configService.get<string>('USER_FIRST_NAME');
+    const lastName = this.configService.get<string>('USER_LAST_NAME');
+    const email = this.configService.get<string>('USER_EMAIL');
+    const password = this.configService.get<string>('USER_PASSWORD');
+    const university = this.configService.get<string>('USER_UNIVERSITY');
+    const configuration = [
+      ['USER_FIRST_NAME', firstName],
+      ['USER_LAST_NAME', lastName],
+      ['USER_EMAIL', email],
+      ['USER_PASSWORD', password],
+      ['USER_UNIVERSITY', university],
+    ] as const;
+    const configuredValues = configuration.filter(([, value]) =>
+      value?.trim(),
+    );
+
+    if (configuredValues.length === 0) {
+      this.logger.warn(
+        'Sample user seeding skipped because USER_* configuration is not set',
+      );
+      return null;
+    }
+
+    const missingConfig = configuration
+      .filter(([, value]) => !value?.trim())
+      .map(([key]) => key);
+
+    if (
+      missingConfig.length > 0 ||
+      !firstName?.trim() ||
+      !lastName?.trim() ||
+      !email?.trim() ||
+      !password?.trim() ||
+      !university?.trim()
+    ) {
+      throw new Error(
+        `Cannot seed sample user; missing configuration: ${missingConfig.join(', ')}`,
+      );
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingUser = await this.userRepository.findOneBy({
+      email: normalizedEmail,
+    });
+
+    if (existingUser) {
+      this.logger.debug('First user already exists');
+      return existingUser;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = this.userRepository.create({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      university: university.trim(),
+      role: Role.User,
+      isEmailVerified: true,
+    });
+
+    const savedUser = await this.userRepository.save(user);
+    this.logger.debug('User created successfully');
+    return savedUser;
   }
 
   // ========== GET USER PROFILE (EXCLUDING PASSWORD) ==========

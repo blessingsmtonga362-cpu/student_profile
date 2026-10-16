@@ -19,8 +19,10 @@ describe('UserService registration', () => {
     Pick<Repository<User>, 'findOneBy' | 'create' | 'save'>
   >;
   let emailService: jest.Mocked<Pick<EmailService, 'sendOtpEmail'>>;
+  const userConfig: Record<string, string> = {};
 
   beforeEach(async () => {
+    Object.keys(userConfig).forEach((key) => delete userConfig[key]);
     userRepository = {
       findOneBy: jest.fn(),
       create: jest.fn((user) => user as User),
@@ -41,7 +43,10 @@ describe('UserService registration', () => {
           provide: getRepositoryToken(PersonalDetails),
           useValue: {},
         },
-        { provide: ConfigService, useValue: {} },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn((key: string) => userConfig[key]) },
+        },
         { provide: JwtService, useValue: { sign: jest.fn() } },
         { provide: EmailService, useValue: emailService },
       ],
@@ -130,5 +135,30 @@ describe('UserService registration', () => {
     expect(pendingUser.otp).toBe('123456');
     expect(pendingUser.otpExpiry).toBe(oldExpiry);
     expect(userRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('creates the configured sample user with a normalized email and hashed password', async () => {
+    Object.assign(userConfig, {
+      USER_FIRST_NAME: 'Sample',
+      USER_LAST_NAME: 'User',
+      USER_EMAIL: ' SAMPLE@Example.com ',
+      USER_PASSWORD: 'Password1!',
+      USER_UNIVERSITY: 'unima',
+    });
+    userRepository.findOneBy.mockResolvedValue(null);
+    userRepository.save.mockImplementation((user) =>
+      Promise.resolve(user as User),
+    );
+
+    const createdUser = await service.createUser();
+
+    expect(createdUser).toMatchObject({
+      firstName: 'Sample',
+      lastName: 'User',
+      email: 'sample@example.com',
+      university: 'unima',
+      isEmailVerified: true,
+    });
+    expect(createdUser?.password).not.toBe('Password1!');
   });
 });
