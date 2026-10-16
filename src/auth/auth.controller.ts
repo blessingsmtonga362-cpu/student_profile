@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { AuthGuard } from './auth.guard';
@@ -49,28 +49,31 @@ export class AuthController {
   }
 
   /**
-   * OTP Endpoints for Phone Verification (Application Submission)
+   * OTP endpoints for email verification during application submission.
    */
 
   @Public()
-  @Post('send-phone-otp')
+  @Post('send-email-otp')
   @HttpCode(HttpStatus.OK)
-  async sendPhoneOtp(@Body() dto: SendOtpDto) {
+  async sendEmailOtp(@Body() dto: SendOtpDto) {
     return this.otpService.sendOtp(dto);
   }
 
   @Public()
-  @Post('verify-phone-otp')
+  @Post('verify-email-otp')
   @HttpCode(HttpStatus.OK)
-  async verifyPhoneOtp(@Body() dto: VerifyOtpDto) {
+  async verifyEmailOtp(@Body() dto: VerifyOtpDto) {
     return this.otpService.verifyOtp(dto);
   }
 
   @Public()
-  @Post('check-phone-verified')
+  @Post('check-email-verified')
   @HttpCode(HttpStatus.OK)
-  async checkPhoneVerified(@Body() body: { phoneNumber: string }) {
-    const verified = await this.otpService.isPhoneVerified(body.phoneNumber, 'application_submission');
+  async checkEmailVerified(@Body() body: { email: string }) {
+    if (!body?.email) {
+      throw new BadRequestException('Email is required');
+    }
+    const verified = await this.otpService.isEmailVerified(body.email, 'application_submission');
     return {
       success: true,
       verified,
