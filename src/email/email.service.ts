@@ -23,10 +23,14 @@ export class EmailService {
       return;
     }
     
+    const smtpPort = Number(this.configService.get('SMTP_PORT', 587));
     this.transporter = nodemailer.createTransport({
       host: this.configService.get('SMTP_HOST', 'smtp.gmail.com'),
-      port: this.configService.get('SMTP_PORT', 587),
-      secure: false,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 30_000,
       auth: {
         user: smtpUser,
         pass: smtpPassword,
@@ -57,15 +61,23 @@ export class EmailService {
       this.logger.log(`Email sent to ${options.to}, Subject: ${options.subject}, Message ID: ${info.messageId}`);
       return { success: true, messageId: info.messageId };
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}: ${error.message}`);
-      // Fallback to console logging
-      this.logEmailToConsole(options);
+      this.logger.error(
+        `Failed to send email to ${options.to}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       throw error;
     }
   }
 
   // Send OTP verification email
   async sendOtpEmail(to: string, name: string, otp: string) {
+    if (!this.transporter) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Please contact support.',
+      );
+    }
+
     const safeName = this.escapeHtml(name);
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
