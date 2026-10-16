@@ -43,8 +43,14 @@ async function bootstrap() {
     prefix: '/uploads/',
   });
   
+  const allowedOrigins = configService
+    .get<string>('CORS_ORIGINS', configService.get<string>('FRONTEND_URL', 'http://localhost:3000'))
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+
   app.enableCors({
-    origin: true, 
+    origin: allowedOrigins, 
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
