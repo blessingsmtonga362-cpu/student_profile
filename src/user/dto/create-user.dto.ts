@@ -27,9 +27,6 @@ export class CreateUserDto {
   )
   @IsNotEmpty({ message: 'email should not be empty' })
   @IsEmail()
-  @Matches(/@unima\.ac\.mw$/i, {
-    message: 'Only University of Malawi email addresses are allowed',
-  })
   email!: string;
 
   @Transform(({ value }) =>

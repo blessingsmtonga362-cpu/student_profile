@@ -4,8 +4,6 @@ import { JwtService } from '@nestjs/jwt';
 import { UserService } from '../user/user.service';
 import * as bcrypt from 'bcrypt';
 
-const UNIMA_EMAIL_DOMAIN = '@unima.ac.mw';
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -15,13 +13,6 @@ export class AuthService {
 
   async login(email: string, password: string): Promise<any> {
     const normalizedEmail = email.trim().toLowerCase();
-
-    // Validate email domain
-    if (!normalizedEmail.endsWith(UNIMA_EMAIL_DOMAIN)) {
-      throw new UnauthorizedException(
-        'Only University of Malawi email addresses are allowed'
-      );
-    }
 
     // Find user by email
     const user = await this.userService.findByEmail(normalizedEmail);
