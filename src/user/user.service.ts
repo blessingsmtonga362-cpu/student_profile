@@ -383,65 +383,33 @@ export class UserService {
   }
 
   // ========== CREATE SAMPLE USER (FOR SEEDING) ==========
-  async createUser(): Promise<User | null> {
-    const firstName = this.configService.get<string>('USER_FIRST_NAME');
-    const lastName = this.configService.get<string>('USER_LAST_NAME');
-    const email = this.configService.get<string>('USER_EMAIL');
-    const password = this.configService.get<string>('USER_PASSWORD');
-    const university = this.configService.get<string>('USER_UNIVERSITY');
-    const configuration = [
-      ['USER_FIRST_NAME', firstName],
-      ['USER_LAST_NAME', lastName],
-      ['USER_EMAIL', email],
-      ['USER_PASSWORD', password],
-      ['USER_UNIVERSITY', university],
-    ] as const;
-    const configuredValues = configuration.filter(([, value]) =>
-      value?.trim(),
-    );
-
-    if (configuredValues.length === 0) {
-      this.logger.warn(
-        'Sample user seeding skipped because USER_* configuration is not set',
-      );
-      return null;
-    }
-
-    const missingConfig = configuration
-      .filter(([, value]) => !value?.trim())
-      .map(([key]) => key);
-
-    if (
-      missingConfig.length > 0 ||
-      !firstName?.trim() ||
-      !lastName?.trim() ||
-      !email?.trim() ||
-      !password?.trim() ||
-      !university?.trim()
-    ) {
-      throw new Error(
-        `Cannot seed sample user; missing configuration: ${missingConfig.join(', ')}`,
-      );
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const existingUser = await this.userRepository.findOneBy({
-      email: normalizedEmail,
+  async createUser() {
+    const existingAdmin = await this.userRepository.findOneBy({
+      email: this.configService.get<string>(
+        'USER_EMAIL',
+        'blessingsmtonga362@unima.ac.mw',
+      ),
     });
 
-    if (existingUser) {
+    if (existingAdmin) {
       this.logger.debug('First user already exists');
-      return existingUser;
+      return existingAdmin;
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(
+      this.configService.get<string>('USER_PASSWORD', 'bimto27'),
+      10,
+    );
 
     const user = this.userRepository.create({
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: normalizedEmail,
+      firstName: this.configService.get<string>('USER_FIRST_NAME', 'blessings'),
+      lastName: this.configService.get<string>('USER_LAST_NAME', 'network'),
+      email: this.configService.get<string>(
+        'USER_EMAIL',
+        'blessingsmtonga362@unima.ac.mw',
+      ),
       password: hashedPassword,
-      university: university.trim(),
+      university: this.configService.get<string>('USER_UNIVERSITY', 'chanco'),
       role: Role.User,
       isEmailVerified: true,
     });
