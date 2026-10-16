@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Request, UseGuards, HttpCode, HttpStatus, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { OtpService } from './otp.service';
 import { AuthGuard } from './auth.guard';
@@ -25,6 +35,9 @@ export class AuthController {
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
   async verifyOtp(@Body() body: { email: string; otp: string }) {
+    if (!body?.email || !body?.otp) {
+      throw new BadRequestException('Email and OTP are required');
+    }
     return this.userService.verifyOtp(body.email, body.otp);
   }
 
@@ -32,6 +45,9 @@ export class AuthController {
   @Post('resend-otp')
   @HttpCode(HttpStatus.OK)
   async resendOtp(@Body() body: { email: string }) {
+    if (!body?.email) {
+      throw new BadRequestException('Email is required');
+    }
     return this.userService.resendOtp(body.email);
   }
 
