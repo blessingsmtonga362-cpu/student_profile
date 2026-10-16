@@ -18,7 +18,7 @@ export class UserController {
   @Public()
   @Post('verify-otp')
   async verifyOtp(@Body() body: { email: string; otp: string }) {
-    if (!body.email || !body.otp) {
+    if (!body?.email || !body?.otp) {
       throw new BadRequestException('Email and OTP are required');
     }
     return await this.userService.verifyOtp(body.email, body.otp);
