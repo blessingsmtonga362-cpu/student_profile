@@ -345,7 +345,7 @@ export class UserService {
   // ========== CREATE ADMIN USER (FOR SEEDING) ==========
 
   ///////////////////////////////
-  async createAdmin() {
+  async createuser() {
     const existingAdmin = await this.userRepository.findOneBy({
       email: this.configService.get<string>(
         'ADMIN_EMAIL',
@@ -371,7 +371,7 @@ export class UserService {
         'blessingsmtonga362@gmail.com',
       ),
       password: hashedPassword,
-      university: this.configService.get<string>('USER_UNIVERSITY', 'chanco'),
+      university: this.configService.get<string>('USERZ_UNIVERSITY', 'chanco'),
       role: Role.User,
       isEmailVerified: true,
     });
