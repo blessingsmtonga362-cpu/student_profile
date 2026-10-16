@@ -34,8 +34,9 @@ export class UserService {
 
   // ========== CREATE USER (DIRECT CREATION - NO OTP) ==========
   async create(createUserDto: CreateUserDto): Promise<Omit<User, 'password'>> {
+    const email = createUserDto.email.trim().toLowerCase();
     const existingUser = await this.userRepository.findOneBy({
-      email: createUserDto.email,
+      email,
     });
 
     if (existingUser) {
@@ -46,6 +47,7 @@ export class UserService {
 
     const user = this.userRepository.create({
       ...createUserDto,
+      email,
       university: 'unima',
       password: hashedPassword,
       role: Role.User,
@@ -63,8 +65,9 @@ export class UserService {
     otp: string,
     otpExpiry: Date,
   ): Promise<User> {
+    const email = createUserDto.email.trim().toLowerCase();
     const existingUser = await this.userRepository.findOneBy({
-      email: createUserDto.email,
+      email,
     });
 
     if (existingUser) {
@@ -75,6 +78,7 @@ export class UserService {
 
     const user = this.userRepository.create({
       ...createUserDto,
+      email,
       university: 'unima',
       password: hashedPassword,
       role: Role.User,
@@ -90,12 +94,22 @@ export class UserService {
   async register(
     createUser: CreateUserDto,
   ): Promise<{ message: string; email: string }> {
+    const email = createUser.email.trim().toLowerCase();
     const existingUser = await this.userRepository.findOneBy({
-      email: createUser.email,
+      email,
     });
 
     if (existingUser) {
-      throw new ConflictException('Email is already registered');
+      if (existingUser.isEmailVerified) {
+        throw new ConflictException('Email is already registered');
+      }
+
+      await this.resendOtp(email);
+      return {
+        message:
+          'Registration is already in progress. A new verification code has been sent to your email.',
+        email,
+      };
     }
 
     const hashedPassword = await bcrypt.hash(createUser.password, 10);
@@ -111,6 +125,7 @@ export class UserService {
 
     const user = this.userRepository.create({
       ...createUser,
+      email,
       university: 'unima',
       password: hashedPassword,
       role: Role.User,
@@ -121,23 +136,7 @@ export class UserService {
 
     await this.userRepository.save(user);
 
-    // The user is saved before email delivery so resendOtp() can recover from
-    // temporary SMTP failures without deleting a legitimate registration.
-    try {
-      await this.emailService.sendOtpEmail(
-        user.email,
-        user.firstName || 'User',
-        otp,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to send registration OTP email to ${user.email}`,
-        error instanceof Error ? error.stack : String(error),
-      );
-      throw new ServiceUnavailableException(
-        'Registration was saved, but the verification email could not be sent. Please request a new verification code.',
-      );
-    }
+    await this.sendRegistrationOtp(user, otp);
 
     return {
       message:
@@ -156,7 +155,10 @@ export class UserService {
     access_token?: string;
     user?: any;
   }> {
-    const user = await this.userRepository.findOneBy({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.userRepository.findOneBy({
+      email: normalizedEmail,
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -220,7 +222,10 @@ export class UserService {
 
   // ========== RESEND OTP ==========
   async resendOtp(email: string): Promise<{ message: string }> {
-    const user = await this.userRepository.findOneBy({ email });
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.userRepository.findOneBy({
+      email: normalizedEmail,
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');
@@ -233,7 +238,8 @@ export class UserService {
     // Generate new OTP
     const otp = this.generateOtp();
 
-    // Reset expiry to 10 minutes from now
+    await this.sendRegistrationOtp(user, otp);
+
     const otpExpiry = new Date();
     otpExpiry.setMinutes(otpExpiry.getMinutes() + 10);
     otpExpiry.setSeconds(0);
@@ -242,13 +248,6 @@ export class UserService {
     user.otp = otp;
     user.otpExpiry = otpExpiry;
     await this.userRepository.save(user);
-
-    // Send new OTP email
-    await this.emailService.sendOtpEmail(
-      user.email,
-      user.firstName || 'User',
-      otp,
-    );
 
     return {
       message:
@@ -268,9 +267,29 @@ export class UserService {
     return randomInt(100000, 1000000).toString();
   }
 
+  private async sendRegistrationOtp(user: User, otp: string): Promise<void> {
+    try {
+      await this.emailService.sendOtpEmail(
+        user.email,
+        user.firstName || 'User',
+        otp,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send registration OTP email to ${user.email}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw new ServiceUnavailableException(
+        'The verification email could not be sent. Please try again shortly or contact support.',
+      );
+    }
+  }
+
   // ========== FIND USER BY EMAIL ==========
   async findByEmail(email: string): Promise<User | null> {
-    return this.userRepository.findOne({ where: { email } });
+    return this.userRepository.findOne({
+      where: { email: email.trim().toLowerCase() },
+    });
   }
 
   // ========== FIND USER BY ID ==========
