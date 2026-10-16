@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
@@ -88,6 +88,42 @@ export class EmailService {
     `;
 
     return this.sendEmail({ to, subject: 'Your Verification Code - Mthandizi Student Portal', html });
+  }
+
+  /** Send an application verification code and fail when SMTP is unavailable. */
+  async sendEmailOtp(to: string, otp: string, expiryMinutes: number): Promise<void> {
+    if (!this.transporter) {
+      throw new ServiceUnavailableException(
+        'Email delivery is not configured. Please contact support.',
+      );
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #1e3a5f; padding: 20px; text-align: center;">
+          <h2 style="color: white; margin: 0;">Mthandizi Student Portal</h2>
+        </div>
+        <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+          <h2>Email verification</h2>
+          <p>Use this code to verify your email address:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <div style="font-size: 32px; font-weight: bold; letter-spacing: 10px; background: #f3f4f6; padding: 15px; border-radius: 10px;">
+              ${otp}
+            </div>
+          </div>
+          <p><strong>This code expires in ${expiryMinutes} minutes.</strong></p>
+          <p>If you did not request this code, you can ignore this email.</p>
+          <hr style="margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">This is an automated message, please do not reply.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to,
+      subject: 'Your Email Verification Code - Mthandizi Student Portal',
+      html,
+    });
   }
 
   // Send application submission confirmation to student
